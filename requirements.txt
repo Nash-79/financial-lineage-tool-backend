@@ -43,6 +43,7 @@ pyyaml>=6.0.0
 tenacity>=8.2.0
 structlog>=24.1.0
 watchdog>=3.0.0
+duckdb>=0.9.0
 
 # Testing
 pytest>=7.4.0

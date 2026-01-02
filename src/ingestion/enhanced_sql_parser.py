@@ -18,6 +18,7 @@ from enum import Enum
 
 class SQLServerObjectType(str, Enum):
     """SQL Server object types from comment headers."""
+
     TABLE = "Table"
     VIEW = "View"
     FUNCTION = "UserDefinedFunction"
@@ -37,6 +38,7 @@ class SQLServerObjectType(str, Enum):
 @dataclass
 class SQLServerObject:
     """Represents a SQL Server database object."""
+
     object_type: SQLServerObjectType
     schema: str
     name: str
@@ -44,15 +46,17 @@ class SQLServerObject:
     sql_content: str
     start_line: int = 0
     end_line: int = 0
-    parent_object: Optional[str] = None  # For constraints/indexes, the table/view they belong to
+    parent_object: Optional[str] = (
+        None  # For constraints/indexes, the table/view they belong to
+    )
     script_date: Optional[str] = None
 
     # Related objects (for hierarchical grouping)
-    constraints: List['SQLServerObject'] = field(default_factory=list)
-    indexes: List['SQLServerObject'] = field(default_factory=list)
-    defaults: List['SQLServerObject'] = field(default_factory=list)
-    foreign_keys: List['SQLServerObject'] = field(default_factory=list)
-    check_constraints: List['SQLServerObject'] = field(default_factory=list)
+    constraints: List["SQLServerObject"] = field(default_factory=list)
+    indexes: List["SQLServerObject"] = field(default_factory=list)
+    defaults: List["SQLServerObject"] = field(default_factory=list)
+    foreign_keys: List["SQLServerObject"] = field(default_factory=list)
+    check_constraints: List["SQLServerObject"] = field(default_factory=list)
     extended_properties: List[Dict] = field(default_factory=list)
 
 
@@ -66,41 +70,41 @@ class EnhancedSQLParser:
 
     # Pattern for SQL Server object comments
     OBJECT_COMMENT_PATTERN = re.compile(
-        r'/\*{6}\s+Object:\s+(\w+)\s+(\[[\w\.\[\]]+\])\s+Script Date:([^\*]+)\*{6}/',
-        re.IGNORECASE
+        r"/\*{6}\s+Object:\s+(\w+)\s+(\[[\w\.\[\]]+\])\s+Script Date:([^\*]+)\*{6}/",
+        re.IGNORECASE,
     )
 
     # Pattern for GO statements (batch separator)
-    GO_PATTERN = re.compile(r'^\s*GO\s*$', re.IGNORECASE | re.MULTILINE)
+    GO_PATTERN = re.compile(r"^\s*GO\s*$", re.IGNORECASE | re.MULTILINE)
 
     # Pattern for ALTER TABLE ... ADD CONSTRAINT
     ALTER_CONSTRAINT_PATTERN = re.compile(
-        r'ALTER\s+TABLE\s+(\[[\w\.\[\]]+\])\s+ADD\s+CONSTRAINT\s+(\[[\w\.\[\]]+\])',
-        re.IGNORECASE
+        r"ALTER\s+TABLE\s+(\[[\w\.\[\]]+\])\s+ADD\s+CONSTRAINT\s+(\[[\w\.\[\]]+\])",
+        re.IGNORECASE,
     )
 
     # Pattern for ALTER TABLE ... ADD (defaults)
     ALTER_DEFAULT_PATTERN = re.compile(
-        r'ALTER\s+TABLE\s+(\[[\w\.\[\]]+\])\s+ADD\s+CONSTRAINT\s+(\[[\w\.\[\]]+\])\s+DEFAULT',
-        re.IGNORECASE
+        r"ALTER\s+TABLE\s+(\[[\w\.\[\]]+\])\s+ADD\s+CONSTRAINT\s+(\[[\w\.\[\]]+\])\s+DEFAULT",
+        re.IGNORECASE,
     )
 
     # Pattern for foreign keys
     FOREIGN_KEY_PATTERN = re.compile(
-        r'ALTER\s+TABLE\s+(\[[\w\.\[\]]+\])\s+(?:WITH\s+CHECK\s+)?ADD\s+CONSTRAINT\s+(\[[\w\.\[\]]+\])\s+FOREIGN\s+KEY',
-        re.IGNORECASE
+        r"ALTER\s+TABLE\s+(\[[\w\.\[\]]+\])\s+(?:WITH\s+CHECK\s+)?ADD\s+CONSTRAINT\s+(\[[\w\.\[\]]+\])\s+FOREIGN\s+KEY",
+        re.IGNORECASE,
     )
 
     # Pattern for check constraints
     CHECK_CONSTRAINT_PATTERN = re.compile(
-        r'ALTER\s+TABLE\s+(\[[\w\.\[\]]+\])\s+(?:WITH\s+CHECK\s+)?ADD\s+CONSTRAINT\s+(\[[\w\.\[\]]+\])\s+CHECK',
-        re.IGNORECASE
+        r"ALTER\s+TABLE\s+(\[[\w\.\[\]]+\])\s+(?:WITH\s+CHECK\s+)?ADD\s+CONSTRAINT\s+(\[[\w\.\[\]]+\])\s+CHECK",
+        re.IGNORECASE,
     )
 
     # Pattern for extended properties
     EXTENDED_PROPERTY_PATTERN = re.compile(
         r"EXEC\s+sys\.sp_addextendedproperty\s+@name=N'(\w+)',\s+@value=N'([^']*)'",
-        re.IGNORECASE | re.DOTALL
+        re.IGNORECASE | re.DOTALL,
     )
 
     def __init__(self, dialect: str = "tsql", cache=None):
@@ -124,22 +128,19 @@ class EnhancedSQLParser:
             cached_result = self.cache.get(file_path)
             if cached_result is not None:
                 # Restore parser state from cache
-                self.objects = cached_result['objects']
-                self.object_map = cached_result['object_map']
+                self.objects = cached_result["objects"]
+                self.object_map = cached_result["object_map"]
                 return self.objects
 
         # Cache miss or no cache - parse file
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         result = self.parse_file(content)
 
         # Store in cache if available
         if self.cache:
-            cache_data = {
-                'objects': self.objects,
-                'object_map': self.object_map
-            }
+            cache_data = {"objects": self.objects, "object_map": self.object_map}
             self.cache.set(file_path, cache_data)
 
         return result
@@ -175,15 +176,15 @@ class EnhancedSQLParser:
     def _split_by_object_comments(self, content: str) -> List[Dict]:
         """Split content by /****** Object: ... ******/ comments."""
         chunks = []
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         current_chunk = {
-            'header': None,
-            'object_type': None,
-            'object_name': None,
-            'script_date': None,
-            'content_lines': [],
-            'start_line': 0
+            "header": None,
+            "object_type": None,
+            "object_name": None,
+            "script_date": None,
+            "content_lines": [],
+            "start_line": 0,
         }
 
         line_num = 0
@@ -196,41 +197,41 @@ class EnhancedSQLParser:
 
             if match:
                 # Save previous chunk if it has content
-                if current_chunk['content_lines']:
+                if current_chunk["content_lines"]:
                     chunks.append(current_chunk)
 
                 # Start new chunk
                 current_chunk = {
-                    'header': match.group(0),
-                    'object_type': match.group(1).strip(),
-                    'object_name': match.group(2).strip(),
-                    'script_date': match.group(3).strip(),
-                    'content_lines': [],
-                    'start_line': line_num
+                    "header": match.group(0),
+                    "object_type": match.group(1).strip(),
+                    "object_name": match.group(2).strip(),
+                    "script_date": match.group(3).strip(),
+                    "content_lines": [],
+                    "start_line": line_num,
                 }
             else:
-                current_chunk['content_lines'].append(line)
+                current_chunk["content_lines"].append(line)
 
         # Add last chunk
-        if current_chunk['content_lines']:
+        if current_chunk["content_lines"]:
             chunks.append(current_chunk)
 
         return chunks
 
     def _parse_object_chunk(self, chunk: Dict) -> Optional[SQLServerObject]:
         """Parse a single object chunk."""
-        if not chunk.get('object_name'):
+        if not chunk.get("object_name"):
             # No object header - might be orphan SQL
             return None
 
-        object_type = self._map_object_type(chunk['object_type'])
-        full_name = chunk['object_name']
+        object_type = self._map_object_type(chunk["object_type"])
+        full_name = chunk["object_name"]
 
         # Extract schema and name
         schema, name = self._parse_full_name(full_name)
 
         # Get SQL content
-        sql_content = '\n'.join(chunk['content_lines'])
+        sql_content = "\n".join(chunk["content_lines"])
 
         # Detect parent object for constraints/indexes
         parent_object = self._detect_parent_object(sql_content, object_type)
@@ -241,53 +242,56 @@ class EnhancedSQLParser:
             name=name,
             full_name=full_name,
             sql_content=sql_content,
-            start_line=chunk['start_line'],
+            start_line=chunk["start_line"],
             parent_object=parent_object,
-            script_date=chunk.get('script_date')
+            script_date=chunk.get("script_date"),
         )
 
     def _map_object_type(self, type_str: str) -> SQLServerObjectType:
         """Map SQL Server object type string to enum."""
         type_mapping = {
-            'table': SQLServerObjectType.TABLE,
-            'view': SQLServerObjectType.VIEW,
-            'storedprocedure': SQLServerObjectType.PROCEDURE,
-            'userdefinedfunction': SQLServerObjectType.FUNCTION,
-            'index': SQLServerObjectType.INDEX,
-            'default': SQLServerObjectType.CONSTRAINT,
-            'foreignkey': SQLServerObjectType.FOREIGN_KEY,
-            'check': SQLServerObjectType.CHECK_CONSTRAINT,
-            'primarykey': SQLServerObjectType.PRIMARY_KEY,
-            'trigger': SQLServerObjectType.TRIGGER,
-            'schema': SQLServerObjectType.SCHEMA,
-            'userdefinedtype': SQLServerObjectType.TYPE,
-            'xmlschemacollection': SQLServerObjectType.XML_SCHEMA,
+            "table": SQLServerObjectType.TABLE,
+            "view": SQLServerObjectType.VIEW,
+            "storedprocedure": SQLServerObjectType.PROCEDURE,
+            "userdefinedfunction": SQLServerObjectType.FUNCTION,
+            "index": SQLServerObjectType.INDEX,
+            "default": SQLServerObjectType.CONSTRAINT,
+            "foreignkey": SQLServerObjectType.FOREIGN_KEY,
+            "check": SQLServerObjectType.CHECK_CONSTRAINT,
+            "primarykey": SQLServerObjectType.PRIMARY_KEY,
+            "trigger": SQLServerObjectType.TRIGGER,
+            "schema": SQLServerObjectType.SCHEMA,
+            "userdefinedtype": SQLServerObjectType.TYPE,
+            "xmlschemacollection": SQLServerObjectType.XML_SCHEMA,
         }
 
-        key = type_str.lower().replace('_', '').replace(' ', '')
+        key = type_str.lower().replace("_", "").replace(" ", "")
         return type_mapping.get(key, SQLServerObjectType.UNKNOWN)
 
     def _parse_full_name(self, full_name: str) -> tuple:
         """Parse [Schema].[Name] into schema and name."""
         # Remove brackets
-        clean_name = full_name.replace('[', '').replace(']', '')
+        clean_name = full_name.replace("[", "").replace("]", "")
 
-        parts = clean_name.split('.')
+        parts = clean_name.split(".")
         if len(parts) == 2:
             return parts[0], parts[1]
         elif len(parts) == 1:
-            return 'dbo', parts[0]
+            return "dbo", parts[0]
         else:
             # Handle [Database].[Schema].[Name]
             return parts[-2], parts[-1]
 
-    def _detect_parent_object(self, sql_content: str, object_type: SQLServerObjectType) -> Optional[str]:
+    def _detect_parent_object(
+        self, sql_content: str, object_type: SQLServerObjectType
+    ) -> Optional[str]:
         """Detect parent object for constraints and indexes."""
         if object_type == SQLServerObjectType.INDEX:
             # Look for CREATE INDEX ... ON [Table] or CREATE INDEX ... ON [Schema].[Table]
             match = re.search(
-                r'CREATE\s+(?:UNIQUE\s+)?(?:CLUSTERED\s+|NONCLUSTERED\s+)?INDEX\s+\[?\w+\]?\s+ON\s+(\[[^\]]+\]\.\[[^\]]+\]|\[[^\]]+\])',
-                sql_content, re.IGNORECASE
+                r"CREATE\s+(?:UNIQUE\s+)?(?:CLUSTERED\s+|NONCLUSTERED\s+)?INDEX\s+\[?\w+\]?\s+ON\s+(\[[^\]]+\]\.\[[^\]]+\]|\[[^\]]+\])",
+                sql_content,
+                re.IGNORECASE,
             )
             if match:
                 return match.group(1)
@@ -321,7 +325,11 @@ class EnhancedSQLParser:
                     parent = self.object_map[obj.parent_object]
                 else:
                     # Try to match by name only (without schema)
-                    parent_name = obj.parent_object.replace('[', '').replace(']', '').split('.')[-1]
+                    parent_name = (
+                        obj.parent_object.replace("[", "")
+                        .replace("]", "")
+                        .split(".")[-1]
+                    )
                     for full_name, parent_obj in self.object_map.items():
                         if parent_obj.name == parent_name:
                             parent = parent_obj
@@ -329,11 +337,14 @@ class EnhancedSQLParser:
 
             if parent:
                 # Group by object type
-                if 'FOREIGN' in obj.sql_content.upper():
+                if "FOREIGN" in obj.sql_content.upper():
                     parent.foreign_keys.append(obj)
-                elif 'CHECK' in obj.sql_content.upper() and 'CONSTRAINT' in obj.sql_content.upper():
+                elif (
+                    "CHECK" in obj.sql_content.upper()
+                    and "CONSTRAINT" in obj.sql_content.upper()
+                ):
                     parent.check_constraints.append(obj)
-                elif 'DEFAULT' in obj.sql_content.upper():
+                elif "DEFAULT" in obj.sql_content.upper():
                     parent.defaults.append(obj)
                 elif obj.object_type == SQLServerObjectType.INDEX:
                     parent.indexes.append(obj)
@@ -356,29 +367,36 @@ class EnhancedSQLParser:
 
             # Extract object information from the EXEC statement
             # This is simplified - full implementation would parse all parameters
-            properties_map.setdefault('global', []).append({
-                'name': prop_name,
-                'value': prop_value
-            })
+            properties_map.setdefault("global", []).append(
+                {"name": prop_name, "value": prop_value}
+            )
 
         return properties_map
 
-    def get_objects_by_type(self, object_type: SQLServerObjectType) -> List[SQLServerObject]:
+    def get_objects_by_type(
+        self, object_type: SQLServerObjectType
+    ) -> List[SQLServerObject]:
         """Get all objects of a specific type."""
         return [obj for obj in self.objects if obj.object_type == object_type]
 
     def get_tables_with_dependencies(self) -> List[SQLServerObject]:
         """Get all tables with their constraints and indexes."""
-        return [obj for obj in self.objects
-                if obj.object_type == SQLServerObjectType.TABLE]
+        return [
+            obj for obj in self.objects if obj.object_type == SQLServerObjectType.TABLE
+        ]
 
     def get_indexed_views(self) -> List[SQLServerObject]:
         """Get views that have indexes (indexed views)."""
-        return [obj for obj in self.objects
-                if obj.object_type == SQLServerObjectType.VIEW and len(obj.indexes) > 0]
+        return [
+            obj
+            for obj in self.objects
+            if obj.object_type == SQLServerObjectType.VIEW and len(obj.indexes) > 0
+        ]
 
 
-def parse_sql_with_comments(content: str, dialect: str = "tsql") -> List[SQLServerObject]:
+def parse_sql_with_comments(
+    content: str, dialect: str = "tsql"
+) -> List[SQLServerObject]:
     """
     Convenience function to parse SQL using comment-based detection.
 

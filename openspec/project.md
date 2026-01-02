@@ -1,54 +1,65 @@
 # Project Context
 
 ## Purpose
-An AI-powered solution for SQL database analysis, knowledge graph creation, and data lineage visualization using Azure AI services and multi-agent orchestration. The tool organizes SQL files, extracts entities and relationships into a knowledge graph (Cosmos DB), and enables hybrid search and natural language queries about financial data lineage.
+Financial Lineage Tool - A RAG-powered backend service for analyzing SQL database schemas, tracking data lineage, and providing intelligent semantic search over database artifacts using LlamaIndex and local Ollama LLMs.
 
 ## Tech Stack
-- **Language**: Python 3.10+
-- **Web Framework**: FastAPI, Pydantic, Uvicorn
-- **SQL Processing**: sqlglot, custom SQL Server parser, watchdog (file watching)
-- **Database**: Azure Cosmos DB (Gremlin API) for Knowledge Graph, Redis for caching
-- **AI/ML**: Azure OpenAI (GPT-4o), Azure AI Search (Vector Search), tiktoken, scikit-learn
-- **Infrastructure**: Docker, Docker Compose
-- **Dev Tools**: Black, Ruff, MyPy, Pre-commit
+- **Backend**: Python 3.11, FastAPI, Uvicorn
+- **LLM/RAG**: LlamaIndex, Ollama (llama3.1:8b, nomic-embed-text)
+- **Vector Database**: Qdrant (768-dimensional embeddings)
+- **Graph Database**: Neo4j (cloud-hosted)
+- **Cache**: Redis
+- **Containerization**: Docker, Docker Compose
+- **SQL Parsing**: sqlglot
+- **Testing**: pytest, pytest-asyncio
+- **Code Quality**: black, ruff
 
 ## Project Conventions
 
 ### Code Style
-- **Python**: Follows PEP 8 guidelines.
-- **Formatting**: Enforced by `black`.
-- **Linting**: Enforced by `ruff`.
-- **Type Checking**: Enforced by `mypy`.
-- **Imports**: Sorted and organized.
+- Python code formatted with `black` (line length: 88)
+- Linting with `ruff`
+- Type hints required for function signatures
+- Async/await for I/O operations
+- Pydantic models for API request/response validation
 
 ### Architecture Patterns
-- **Modular Structure**: Domain-driven organization in `src/` (ingestion, knowledge_graph, search, agents, api).
-- **Agentic Workflow**: Multi-agent system orchestrated by a supervisor (`src/agents/supervisor.py`) for complex analysis.
-- **Ingestion Pipeline**: Automated pipeline from file watching -> parsing -> graph ingestion.
-- **API First**: Core functionality exposed via FastAPI endpoints.
+- Multi-service Docker architecture with health checks
+- RAG pipeline: Document ingestion → Embedding → Vector search → LLM generation
+- Feature flags for gradual rollout (USE_LLAMAINDEX)
+- Repository pattern for database access
+- Service layer for business logic
+- RESTful API design with OpenAPI/Swagger docs
 
 ### Testing Strategy
-- **Framework**: `pytest` for unit and integration tests.
-- **Async Support**: `pytest-asyncio` for testing async API endpoints and agents.
-- **Coverage**: Aim for high code coverage (measured via `pytest-cov`).
+- Unit tests with pytest
+- Async tests with pytest-asyncio
+- Integration tests for API endpoints
+- Test coverage for critical RAG pipeline components
+- Docker-based testing environment
 
 ### Git Workflow
-- Standard feature branch workflow.
-- PR reviews required for merging to main.
+- Main branch: `main`
+- Feature branches with descriptive names
+- OpenSpec-driven development for major changes
+- Commit messages with co-authorship for AI assistance
 
 ## Domain Context
-- **Financial Data Lineage**: Tracing data flow across SQL Server databases.
-- **Core Entities**: Tables, Views, Columns, Stored Procedures, Functions, Indexes, Constraints.
-- **Relationships**: Foreign Keys (FK), Dependencies (Data Lineage), Usage references.
-- **SQL Dialect**: Primarily Transact-SQL (T-SQL).
+- SQL schema analysis and lineage tracking
+- Semantic search over database artifacts (tables, views, procedures, functions)
+- Knowledge graph construction from SQL metadata
+- RAG-powered natural language queries about database structure
 
 ## Important Constraints
-- **Azure Dependency**: Full functionality (Knowledge Graph, Search, AI) requires Azure services (Cosmos DB, OpenAI, AI Search).
-- **Local Fallback**: SQL organization features work locally without Azure dependencies.
-- **Proprietary**: Project is "Proprietary - Internal Use Only".
+- Ollama must run on host machine (not in Docker)
+- Docker containers access Ollama via `host.docker.internal`
+- Embeddings are 768-dimensional (nomic-embed-text)
+- Neo4j uses cloud instance (Aura)
+- Resource limits: API (2GB RAM, 2 CPUs), Qdrant (1GB RAM)
 
 ## External Dependencies
-- **Azure OpenAI Service**: For LLM (GPT-4o) & Embeddings.
-- **Azure Cosmos DB**: Gremlin API for graph storage.
-- **Azure AI Search**: For vector and hybrid search.
-- **GitHub API**: Used for some integration features (via `pygithub`).
+- **Ollama**: http://localhost:11434 (required)
+  - Models: llama3.1:8b (4.7GB), nomic-embed-text (274MB)
+- **Neo4j Aura**: neo4j+s://66e1cb8c.databases.neo4j.io
+- **Qdrant**: In-memory vector storage, optional persistence
+- **Redis**: Caching layer for embeddings and queries

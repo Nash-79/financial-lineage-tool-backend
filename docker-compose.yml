@@ -1,93 +1,132 @@
-version: '3.8'
+# Local development stack - NO CLOUD COSTS
+# Uses free, open-source alternatives
 
 services:
-  # Main API service
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  # Qdrant Vector Database (replaces Azure AI Search)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
     ports:
-      - "8000:8000"
-    environment:
-      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
-      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
-      - AZURE_OPENAI_DEPLOYMENT_GPT4O=${AZURE_OPENAI_DEPLOYMENT_GPT4O:-gpt-4o}
-      - AZURE_OPENAI_DEPLOYMENT_EMBEDDING=${AZURE_OPENAI_DEPLOYMENT_EMBEDDING:-text-embedding-ada-002}
-      - COSMOS_ENDPOINT=${COSMOS_ENDPOINT}
-      - COSMOS_KEY=${COSMOS_KEY}
-      - COSMOS_DATABASE=${COSMOS_DATABASE:-lineage-db}
-      - COSMOS_GRAPH=${COSMOS_GRAPH:-lineage-graph}
-      - SEARCH_ENDPOINT=${SEARCH_ENDPOINT}
-      - SEARCH_KEY=${SEARCH_KEY}
-      - SEARCH_INDEX=${SEARCH_INDEX:-code-lineage-index}
-      - STORAGE_CONNECTION_STRING=${STORAGE_CONNECTION_STRING}
-      - STORAGE_CONTAINER=${STORAGE_CONTAINER:-code-repos}
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - "6333:6333" # REST API
+      - "6334:6334" # gRPC
     volumes:
-      - ./src:/app/src:ro
-      - ./config:/app/config:ro
+      - qdrant-data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: [ "CMD", "cat", "/etc/hosts" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '2.0'
     networks:
-      - lineage-network
+      - lineage-local
 
   # Redis for caching (optional)
   redis:
     image: redis:7-alpine
+    container_name: redis
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
-      timeout: 5s
-      retries: 3
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
     networks:
-      - lineage-network
+      - lineage-local
 
-  # Prometheus for metrics (optional)
-  prometheus:
-    image: prom/prometheus:latest
+  # Local API (connects to Ollama on host)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    container_name: lineage-api
     ports:
-      - "9090:9090"
-    volumes:
-      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-    restart: unless-stopped
-    networks:
-      - lineage-network
-
-  # Grafana for dashboards (optional)
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
+      - "8000:8000"
+    env_file:
+      - .env
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
+      # Ollama runs on host machine
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - LLM_MODEL=llama3.1:8b
+      - EMBEDDING_MODEL=nomic-embed-text
+      # Local services
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      # Local storage
+      - STORAGE_PATH=/app/data
+      # LlamaIndex configuration
+      - USE_LLAMAINDEX=true
     volumes:
-      - grafana-data:/var/lib/grafana
+      - ./src:/app/src:ro
+      - ./config:/app/config:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
     depends_on:
-      - prometheus
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
-      - lineage-network
+      - lineage-local
+
+  # Jupyter for exploration (optional)
+  jupyter:
+    image: jupyter/scipy-notebook:latest
+    container_name: lineage-jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./src:/home/jovyan/src:ro
+    networks:
+      - lineage-local
 
 volumes:
+  qdrant-data:
   redis-data:
-  prometheus-data:
-  grafana-data:
+
 
 networks:
-  lineage-network:
+  lineage-local:
     driver: bridge

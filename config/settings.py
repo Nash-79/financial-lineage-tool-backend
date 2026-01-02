@@ -75,13 +75,65 @@ class AgentSettings(BaseSettings):
 
 class ChunkingSettings(BaseSettings):
     """Semantic chunking configuration."""
-    
+
     model_config = SettingsConfigDict(env_prefix="CHUNKING_")
-    
+
     sql_max_tokens: int = Field(default=1500, description="Max tokens for SQL chunks")
     python_max_tokens: int = Field(default=1000, description="Max tokens for Python chunks")
     config_max_tokens: int = Field(default=500, description="Max tokens for config chunks")
     overlap_tokens: int = Field(default=100, description="Overlap tokens between chunks")
+
+
+class DataPathSettings(BaseSettings):
+    """Data folder path configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="DATA_")
+
+    root: str = Field(default="./data", description="Root data directory")
+    database_name: str = Field(default="default", description="Default database name for ingestion")
+
+
+class DuckDBSettings(BaseSettings):
+    """DuckDB metadata storage configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="DUCKDB_")
+
+    path: str = Field(
+        default="data/metadata.duckdb",
+        description="DuckDB database path. Use ':memory:' for in-memory database (cloud hosting)."
+    )
+
+
+class UploadSettings(BaseSettings):
+    """File upload configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="UPLOAD_")
+
+    base_dir: str = Field(
+        default="data/raw/uploaded",
+        description="Base directory for uploaded files"
+    )
+    max_file_size_mb: int = Field(
+        default=50,
+        description="Maximum file size in MB"
+    )
+    allowed_extensions: list[str] = Field(
+        default=[".sql", ".ddl", ".csv", ".json"],
+        description="Allowed file extensions for upload"
+    )
+
+
+class GitHubOAuthSettings(BaseSettings):
+    """GitHub OAuth configuration for repository integration."""
+
+    model_config = SettingsConfigDict(env_prefix="GITHUB_")
+
+    client_id: str = Field(default="", description="GitHub OAuth App client ID")
+    client_secret: str = Field(default="", description="GitHub OAuth App client secret")
+    redirect_uri: str = Field(
+        default="http://localhost:5173/connectors/github/callback",
+        description="OAuth callback redirect URI"
+    )
 
 
 class Settings(BaseSettings):
@@ -104,8 +156,12 @@ class Settings(BaseSettings):
     search: AzureSearchSettings = Field(default_factory=AzureSearchSettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
     github: GitHubSettings = Field(default_factory=GitHubSettings)
+    github_oauth: GitHubOAuthSettings = Field(default_factory=GitHubOAuthSettings)
     agent: AgentSettings = Field(default_factory=AgentSettings)
     chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
+    data_paths: DataPathSettings = Field(default_factory=DataPathSettings)
+    duckdb: DuckDBSettings = Field(default_factory=DuckDBSettings)
+    upload: UploadSettings = Field(default_factory=UploadSettings)
 
 
 @lru_cache()

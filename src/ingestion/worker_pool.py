@@ -10,7 +10,7 @@ import logging
 import os
 import psutil
 from concurrent.futures import ProcessPoolExecutor
-from typing import Callable, Any, Optional, Dict, Tuple
+from typing import Callable, Any, Optional, Dict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import IntEnum
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class Priority(IntEnum):
     """Task priority levels (lower number = higher priority)."""
+
     CRITICAL = 1
     NORMAL = 2
     BATCH = 3
@@ -30,6 +31,7 @@ class Priority(IntEnum):
 @dataclass(order=True)
 class WorkItem:
     """Priority queue work item."""
+
     priority: int
     file_path: str = field(compare=False)
     callback: Callable = field(compare=False)
@@ -54,7 +56,7 @@ class WorkerPool:
         num_workers: Optional[int] = None,
         max_queue_size: int = 200,
         memory_threshold_percent: float = 80.0,
-        enable_back_pressure: bool = True
+        enable_back_pressure: bool = True,
     ):
         """
         Initialize worker pool.
@@ -108,17 +110,13 @@ class WorkerPool:
 
         # Start worker tasks
         self.workers = [
-            asyncio.create_task(self._worker(i))
-            for i in range(self.num_workers)
+            asyncio.create_task(self._worker(i)) for i in range(self.num_workers)
         ]
 
         logger.info(f"Worker pool started with {self.num_workers} workers")
 
     async def submit(
-        self,
-        file_path: str,
-        callback: Callable,
-        priority: Priority = Priority.NORMAL
+        self, file_path: str, callback: Callable, priority: Priority = Priority.NORMAL
     ):
         """
         Submit task to worker pool.
@@ -134,9 +132,7 @@ class WorkerPool:
 
         # Create work item
         work_item = WorkItem(
-            priority=priority.value,
-            file_path=file_path,
-            callback=callback
+            priority=priority.value, file_path=file_path, callback=callback
         )
 
         # Add to queue
@@ -200,8 +196,7 @@ class WorkerPool:
                     # Get next task (with timeout to check shutdown)
                     try:
                         work_item = await asyncio.wait_for(
-                            self.task_queue.get(),
-                            timeout=1.0
+                            self.task_queue.get(), timeout=1.0
                         )
                     except asyncio.TimeoutError:
                         # Check if we should shutdown
@@ -220,14 +215,16 @@ class WorkerPool:
                         await work_item.callback(work_item.file_path)
                         self._tasks_completed += 1
                         metrics.FILES_PROCESSED_TOTAL.inc()
-                        logger.debug(f"Worker {worker_id} completed: {work_item.file_path}")
+                        logger.debug(
+                            f"Worker {worker_id} completed: {work_item.file_path}"
+                        )
 
                     except Exception as e:
                         self._tasks_failed += 1
                         metrics.FILES_FAILED_TOTAL.inc()
                         logger.error(
                             f"Worker {worker_id} failed to process {work_item.file_path}: {e}",
-                            exc_info=True
+                            exc_info=True,
                         )
 
                     finally:
@@ -294,14 +291,17 @@ class WorkerPool:
             "tasks_submitted": self._tasks_submitted,
             "tasks_completed": self._tasks_completed,
             "tasks_failed": self._tasks_failed,
-            "tasks_pending": self._tasks_submitted - self._tasks_completed - self._tasks_failed,
+            "tasks_pending": self._tasks_submitted
+            - self._tasks_completed
+            - self._tasks_failed,
             "back_pressure_events": self._back_pressure_events,
             "success_rate_percent": (
                 round(self._tasks_completed / self._tasks_submitted * 100, 2)
-                if self._tasks_submitted > 0 else 0
+                if self._tasks_submitted > 0
+                else 0
             ),
             "memory_usage_percent": psutil.virtual_memory().percent,
-            "running": self._running
+            "running": self._running,
         }
 
 

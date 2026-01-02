@@ -5,74 +5,94 @@ This directory contains all documentation for the Financial Lineage Tool project
 ## Quick Start
 
 **New users start here**:
-1. [Local Setup Guide](LOCAL_SETUP_GUIDE.md) - Set up development environment
-2. [SQL Organizer Quickstart](SQL_ORGANIZER_QUICKSTART.md) - Start organizing SQL files
-3. [Architecture Overview](ARCHITECTURE.md) - Understand the system
+1. [Docker Setup Guide](setup/DOCKER_SETUP.md) - **Recommended:** Start with Docker
+2. [Getting Started](setup/GETTING_STARTED.md) - Quick start guide
+3. [Architecture Overview](architecture/ARCHITECTURE.md) - Understand the system
 
 ## Documentation by Category
 
-### Getting Started
+### Setup & Installation
 
 | Document | Description |
 |----------|-------------|
-| [Local Setup Guide](LOCAL_SETUP_GUIDE.md) | Complete guide to setting up the development environment |
-| [Getting Started](GETTING_STARTED.md) | **NEW** Quick start guide |
-| [Docker Services](DOCKER_SERVICES.md) | **NEW** Docker service documentation |
-| [Docker Troubleshooting](DOCKER_TROUBLESHOOTING.md) | Docker setup and troubleshooting |
+| [Docker Setup](setup/DOCKER_SETUP.md) | **Recommended:** Docker-based deployment |
+| [Getting Started](setup/GETTING_STARTED.md) | Quick start guide |
+| [Docker Services](setup/DOCKER_SERVICES.md) | Docker service documentation |
+| [Docker Troubleshooting](setup/DOCKER_TROUBLESHOOTING.md) | Docker troubleshooting |
+| [Local Setup Guide](setup/LOCAL_SETUP_GUIDE.md) | **Deprecated:** Manual local setup |
 
-### SQL Organization
-
-| Document | Description |
-|----------|-------------|
-| [SQL Organizer Quickstart](SQL_ORGANIZER_QUICKSTART.md) | Quick start guide for SQL file organization |
-| [Hierarchical Organization Guide](HIERARCHICAL_ORGANIZATION_GUIDE.md) | Comprehensive guide to hierarchical SQL organization |
-| [File Watcher Guide](FILE_WATCHER_GUIDE.md) | Automatic SQL file processing with file watcher |
-
-### Database & Infrastructure
+### User Guides
 
 | Document | Description |
 |----------|-------------|
-| [Gremlin Setup](GREMLIN_SETUP.md) | Azure Cosmos DB Gremlin API setup |
-| [Qdrant Setup](QDRANT_SETUP.md) | Qdrant vector database setup |
-| [AdventureWorks Guide](ADVENTUREWORKS_GUIDE.md) | Working with AdventureWorks sample database |
+| [SQL Organizer Quickstart](guides/SQL_ORGANIZER_QUICKSTART.md) | Quick start for SQL file organization |
+| [Hierarchical Organization Guide](guides/HIERARCHICAL_ORGANIZATION_GUIDE.md) | Comprehensive SQL organization guide |
+| [File Watcher Guide](guides/FILE_WATCHER_GUIDE.md) | Automatic SQL file processing |
+| [Export Guide](guides/EXPORT_GUIDE.md) | Exporting data from knowledge graph and embeddings |
+| [AdventureWorks Guide](guides/ADVENTUREWORKS_GUIDE.md) | Working with AdventureWorks sample database |
 
-### Data & Exports
-
-| Document | Description |
-|----------|-------------|
-| [Export Guide](EXPORT_GUIDE.md) | Exporting data from knowledge graph and embeddings |
-
-### Architecture & Status
+### Architecture & API
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](ARCHITECTURE.md) | System architecture and component overview |
-| [Implementation Status](IMPLEMENTATION_STATUS.md) | Current implementation status and roadmap |
+| [Architecture](architecture/ARCHITECTURE.md) | System architecture and component overview |
+| [LlamaIndex RAG](architecture/LLAMAINDEX_RAG.md) | RAG pipeline documentation |
+| [Implementation Status](architecture/IMPLEMENTATION_STATUS.md) | Current implementation status and roadmap |
+| [API Reference](api/API_REFERENCE.md) | Complete API endpoint documentation |
+
+### Database Configuration
+
+| Document | Description |
+|----------|-------------|
+| [Qdrant Setup](database/QDRANT_SETUP.md) | Qdrant vector database setup |
+| [Gremlin Setup](database/GREMLIN_SETUP.md) | Azure Cosmos DB Gremlin API setup |
+
+### Troubleshooting
+
+| Document | Description |
+|----------|-------------|
+| [Troubleshooting Guide](troubleshooting/TROUBLESHOOTING.md) | Common issues and solutions |
+| [Implementation Summary](troubleshooting/IMPLEMENTATION_SUMMARY.md) | Implementation notes and lessons learned |
+| [Next Steps](troubleshooting/NEXT_STEPS.md) | Planned improvements and roadmap |
 
 ## Documentation by Workflow
 
+### I want to get started quickly
+
+1. [Docker Setup](setup/DOCKER_SETUP.md) - **Start here!** Docker-based deployment
+2. [Getting Started](setup/GETTING_STARTED.md) - Quick start guide
+3. [Architecture Overview](architecture/ARCHITECTURE.md) - Understand the system
+4. [API Reference](api/API_REFERENCE.md) - Explore the API
+
 ### I want to organize SQL files
 
-1. [SQL Organizer Quickstart](SQL_ORGANIZER_QUICKSTART.md) - Basic usage
-2. [Hierarchical Organization Guide](HIERARCHICAL_ORGANIZATION_GUIDE.md) - Advanced organization
-3. [File Watcher Guide](FILE_WATCHER_GUIDE.md) - Automatic processing
+1. [SQL Organizer Quickstart](guides/SQL_ORGANIZER_QUICKSTART.md) - Basic usage
+2. [Hierarchical Organization Guide](guides/HIERARCHICAL_ORGANIZATION_GUIDE.md) - Advanced organization
+3. [File Watcher Guide](guides/FILE_WATCHER_GUIDE.md) - Automatic processing
 
 ### I want to set up the environment
 
-1. [Local Setup Guide](LOCAL_SETUP_GUIDE.md) - Development environment
-2. [Gremlin Setup](GREMLIN_SETUP.md) - Cosmos DB setup
-3. [Qdrant Setup](QDRANT_SETUP.md) - Vector database setup
-4. [Docker Troubleshooting](DOCKER_TROUBLESHOOTING.md) - Docker issues
+1. [Docker Setup](setup/DOCKER_SETUP.md) - **Recommended:** Docker deployment
+2. [Docker Troubleshooting](setup/DOCKER_TROUBLESHOOTING.md) - Docker issues
+3. [Qdrant Setup](database/QDRANT_SETUP.md) - Vector database setup
+4. [Gremlin Setup](database/GREMLIN_SETUP.md) - Cosmos DB setup (legacy)
 
 ### I want to understand the system
 
-1. [Architecture](ARCHITECTURE.md) - System overview
-2. [Implementation Status](IMPLEMENTATION_STATUS.md) - Current status
-3. [AdventureWorks Guide](ADVENTUREWORKS_GUIDE.md) - Sample data
+1. [Architecture](architecture/ARCHITECTURE.md) - System overview
+2. [LlamaIndex RAG](architecture/LLAMAINDEX_RAG.md) - RAG pipeline details
+3. [Implementation Status](architecture/IMPLEMENTATION_STATUS.md) - Current status
+4. [AdventureWorks Guide](guides/ADVENTUREWORKS_GUIDE.md) - Sample data
 
 ### I want to export data
 
-1. [Export Guide](EXPORT_GUIDE.md) - Export embeddings and graph data
+1. [Export Guide](guides/EXPORT_GUIDE.md) - Export embeddings and graph data
+
+### I need help troubleshooting
+
+1. [Docker Troubleshooting](setup/DOCKER_TROUBLESHOOTING.md) - Docker-specific issues
+2. [Troubleshooting Guide](troubleshooting/TROUBLESHOOTING.md) - General troubleshooting
+3. [Implementation Summary](troubleshooting/IMPLEMENTATION_SUMMARY.md) - Implementation notes
 
 ## Quick Reference
 
@@ -127,37 +147,43 @@ python scripts/test_qdrant.py
 
 ```
 docs/
-  README.md                              # This file
-
-  Getting Started:
-    LOCAL_SETUP_GUIDE.md                 # Setup guide
-    DOCKER_TROUBLESHOOTING.md            # Docker help
-
-  SQL Organization:
-    SQL_ORGANIZER_QUICKSTART.md          # Quick start
-    HIERARCHICAL_ORGANIZATION_GUIDE.md   # Hierarchical guide
-    FILE_WATCHER_GUIDE.md                # File watcher
-
-  Database Setup:
-    GREMLIN_SETUP.md                     # Cosmos DB
-    QDRANT_SETUP.md                      # Qdrant
-    ADVENTUREWORKS_GUIDE.md              # Sample data
-
-  Reference:
-    ARCHITECTURE.md                      # System architecture
-    IMPLEMENTATION_STATUS.md             # Project status
-    EXPORT_GUIDE.md                      # Data exports
+├── README.md                            # This file - Documentation hub
+├── setup/                               # Installation and setup
+│   ├── DOCKER_SETUP.md                 # Docker deployment (recommended)
+│   ├── GETTING_STARTED.md              # Quick start guide
+│   ├── DOCKER_SERVICES.md              # Docker service details
+│   ├── DOCKER_TROUBLESHOOTING.md       # Docker troubleshooting
+│   └── LOCAL_SETUP_GUIDE.md            # Manual setup (deprecated)
+├── architecture/                        # System architecture
+│   ├── ARCHITECTURE.md                 # System overview
+│   ├── LLAMAINDEX_RAG.md               # RAG pipeline details
+│   └── IMPLEMENTATION_STATUS.md        # Implementation status
+├── api/                                 # API documentation
+│   └── API_REFERENCE.md                # Complete API reference
+├── guides/                              # User and developer guides
+│   ├── SQL_ORGANIZER_QUICKSTART.md     # SQL organization quick start
+│   ├── HIERARCHICAL_ORGANIZATION_GUIDE.md  # Advanced SQL organization
+│   ├── FILE_WATCHER_GUIDE.md           # File watcher usage
+│   ├── EXPORT_GUIDE.md                 # Data export guide
+│   └── ADVENTUREWORKS_GUIDE.md         # Sample database guide
+├── database/                            # Database configuration
+│   ├── QDRANT_SETUP.md                 # Qdrant vector database
+│   └── GREMLIN_SETUP.md                # Cosmos DB Gremlin (legacy)
+└── troubleshooting/                     # Troubleshooting and notes
+    ├── TROUBLESHOOTING.md              # General troubleshooting
+    ├── IMPLEMENTATION_SUMMARY.md       # Implementation notes
+    └── NEXT_STEPS.md                   # Future improvements
 ```
 
 ## Contributing
 
 When adding new documentation:
 
-1. **Place in docs/ folder** - All documentation goes here
-2. **Update this index** - Add your document to the tables above
-3. **Use descriptive names** - Clear, searchable filenames
+1. **Choose correct category** - Place in appropriate subdirectory (setup/, guides/, etc.)
+2. **Update this hub** - Add your document to the tables above
+3. **Use descriptive names** - Follow UPPER_SNAKE_CASE.md convention
 4. **Link related docs** - Cross-reference related documentation
-5. **Keep README.md clean** - Root README should be brief with link to docs/
+5. **Keep root clean** - Only essential docs in project root
 
 ## Document Templates
 
@@ -211,10 +237,10 @@ Links to related docs
 
 ## Getting Help
 
-- **Documentation Issues**: Check the specific guide in this folder
-- **Setup Issues**: See [Local Setup Guide](LOCAL_SETUP_GUIDE.md)
-- **Docker Issues**: See [Docker Troubleshooting](DOCKER_TROUBLESHOOTING.md)
-- **Architecture Questions**: See [Architecture](ARCHITECTURE.md)
+- **Documentation Issues**: Check the specific guide in the appropriate category
+- **Setup Issues**: See [Docker Setup](setup/DOCKER_SETUP.md) or [Docker Troubleshooting](setup/DOCKER_TROUBLESHOOTING.md)
+- **Architecture Questions**: See [Architecture](architecture/ARCHITECTURE.md)
+- **API Questions**: See [API Reference](api/API_REFERENCE.md)
 
 ## Documentation Standards
 
@@ -226,5 +252,5 @@ Links to related docs
 
 ---
 
-**Last Updated**: 2025-12-08
-**Documentation Version**: 1.0.0
+**Last Updated**: 2025-12-31
+**Documentation Version**: 2.0.0 - Reorganized structure

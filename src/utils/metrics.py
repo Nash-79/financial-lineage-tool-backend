@@ -15,7 +15,6 @@ import threading
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
-from collections import defaultdict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CounterMetric:
     """Counter metric - monotonically increasing value."""
+
     name: str
     help: str
     value: float = 0.0
@@ -45,6 +45,7 @@ class CounterMetric:
 @dataclass
 class GaugeMetric:
     """Gauge metric - value that can go up or down."""
+
     name: str
     help: str
     value: float = 0.0
@@ -70,9 +71,24 @@ class GaugeMetric:
 @dataclass
 class HistogramMetric:
     """Histogram metric - distribution of values."""
+
     name: str
     help: str
-    buckets: List[float] = field(default_factory=lambda: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0])
+    buckets: List[float] = field(
+        default_factory=lambda: [
+            0.005,
+            0.01,
+            0.025,
+            0.05,
+            0.1,
+            0.25,
+            0.5,
+            1.0,
+            2.5,
+            5.0,
+            10.0,
+        ]
+    )
     labels: Dict[str, str] = field(default_factory=dict)
 
     # Internal tracking
@@ -108,7 +124,7 @@ class HistogramMetric:
                 "max": 0.0,
                 "p50": 0.0,
                 "p95": 0.0,
-                "p99": 0.0
+                "p99": 0.0,
             }
 
         sorted_obs = sorted(self.observations)
@@ -122,7 +138,7 @@ class HistogramMetric:
             "max": sorted_obs[-1],
             "p50": sorted_obs[int(n * 0.50)] if n > 0 else 0.0,
             "p95": sorted_obs[int(n * 0.95)] if n > 0 else 0.0,
-            "p99": sorted_obs[int(n * 0.99)] if n > 0 else 0.0
+            "p99": sorted_obs[int(n * 0.99)] if n > 0 else 0.0,
         }
 
 
@@ -141,7 +157,9 @@ class MetricsRegistry:
         self._histograms: Dict[str, HistogramMetric] = {}
         self._start_time = time.time()
 
-    def counter(self, name: str, help: str, labels: Optional[Dict[str, str]] = None) -> CounterMetric:
+    def counter(
+        self, name: str, help: str, labels: Optional[Dict[str, str]] = None
+    ) -> CounterMetric:
         """
         Get or create a counter metric.
 
@@ -158,13 +176,13 @@ class MetricsRegistry:
         with self._lock:
             if key not in self._counters:
                 self._counters[key] = CounterMetric(
-                    name=name,
-                    help=help,
-                    labels=labels or {}
+                    name=name, help=help, labels=labels or {}
                 )
             return self._counters[key]
 
-    def gauge(self, name: str, help: str, labels: Optional[Dict[str, str]] = None) -> GaugeMetric:
+    def gauge(
+        self, name: str, help: str, labels: Optional[Dict[str, str]] = None
+    ) -> GaugeMetric:
         """
         Get or create a gauge metric.
 
@@ -181,14 +199,17 @@ class MetricsRegistry:
         with self._lock:
             if key not in self._gauges:
                 self._gauges[key] = GaugeMetric(
-                    name=name,
-                    help=help,
-                    labels=labels or {}
+                    name=name, help=help, labels=labels or {}
                 )
             return self._gauges[key]
 
-    def histogram(self, name: str, help: str, buckets: Optional[List[float]] = None,
-                  labels: Optional[Dict[str, str]] = None) -> HistogramMetric:
+    def histogram(
+        self,
+        name: str,
+        help: str,
+        buckets: Optional[List[float]] = None,
+        labels: Optional[Dict[str, str]] = None,
+    ) -> HistogramMetric:
         """
         Get or create a histogram metric.
 
@@ -205,11 +226,7 @@ class MetricsRegistry:
 
         with self._lock:
             if key not in self._histograms:
-                hist = HistogramMetric(
-                    name=name,
-                    help=help,
-                    labels=labels or {}
-                )
+                hist = HistogramMetric(name=name, help=help, labels=labels or {})
                 if buckets:
                     hist.buckets = buckets
                     hist.bucket_counts = {b: 0 for b in buckets}
@@ -255,7 +272,9 @@ class MetricsRegistry:
 
                 # Export buckets
                 for bucket, count in sorted(hist.bucket_counts.items()):
-                    bucket_label = self._format_labels({**hist.labels, "le": str(bucket)})
+                    bucket_label = self._format_labels(
+                        {**hist.labels, "le": str(bucket)}
+                    )
                     lines.append(f"{hist.name}_bucket{bucket_label} {count}")
 
                 # Export +Inf bucket
@@ -288,7 +307,7 @@ class MetricsRegistry:
                 "uptime_seconds": time.time() - self._start_time,
                 "counters": {},
                 "gauges": {},
-                "histograms": {}
+                "histograms": {},
             }
 
             for key, counter in self._counters.items():
@@ -327,7 +346,9 @@ def get_registry() -> MetricsRegistry:
 
 
 # Convenience functions for accessing global registry
-def counter(name: str, help: str, labels: Optional[Dict[str, str]] = None) -> CounterMetric:
+def counter(
+    name: str, help: str, labels: Optional[Dict[str, str]] = None
+) -> CounterMetric:
     """Get or create a counter from global registry."""
     return _global_registry.counter(name, help, labels)
 
@@ -337,8 +358,12 @@ def gauge(name: str, help: str, labels: Optional[Dict[str, str]] = None) -> Gaug
     return _global_registry.gauge(name, help, labels)
 
 
-def histogram(name: str, help: str, buckets: Optional[List[float]] = None,
-              labels: Optional[Dict[str, str]] = None) -> HistogramMetric:
+def histogram(
+    name: str,
+    help: str,
+    buckets: Optional[List[float]] = None,
+    labels: Optional[Dict[str, str]] = None,
+) -> HistogramMetric:
     """Get or create a histogram from global registry."""
     return _global_registry.histogram(name, help, buckets, labels)
 
@@ -348,92 +373,73 @@ def histogram(name: str, help: str, buckets: Optional[List[float]] = None,
 
 # Parse Cache Metrics
 PARSE_CACHE_HIT_TOTAL = counter(
-    "parse_cache_hit_total",
-    "Total number of parse cache hits"
+    "parse_cache_hit_total", "Total number of parse cache hits"
 )
 
 PARSE_CACHE_MISS_TOTAL = counter(
-    "parse_cache_miss_total",
-    "Total number of parse cache misses"
+    "parse_cache_miss_total", "Total number of parse cache misses"
 )
 
 PARSE_CACHE_SIZE_BYTES = gauge(
-    "parse_cache_size_bytes",
-    "Current size of parse cache in bytes"
+    "parse_cache_size_bytes", "Current size of parse cache in bytes"
 )
 
 PARSE_CACHE_ENTRIES = gauge(
-    "parse_cache_entries",
-    "Current number of entries in parse cache"
+    "parse_cache_entries", "Current number of entries in parse cache"
 )
 
 # Batch Processing Metrics
 BATCH_SIZE_HISTOGRAM = histogram(
     "batch_size_histogram",
     "Distribution of batch sizes",
-    buckets=[1, 5, 10, 25, 50, 100, 200, 500]
+    buckets=[1, 5, 10, 25, 50, 100, 200, 500],
 )
 
 BATCH_PROCESSING_DURATION_SECONDS = histogram(
-    "batch_processing_duration_seconds",
-    "Time taken to process a batch"
+    "batch_processing_duration_seconds", "Time taken to process a batch"
 )
 
 EVENTS_DEDUPLICATED_TOTAL = counter(
-    "events_deduplicated_total",
-    "Total number of deduplicated events"
+    "events_deduplicated_total", "Total number of deduplicated events"
 )
 
 # Worker Pool Metrics
 FILES_PROCESSED_TOTAL = counter(
-    "files_processed_total",
-    "Total number of files processed"
+    "files_processed_total", "Total number of files processed"
 )
 
 FILES_FAILED_TOTAL = counter(
-    "files_failed_total",
-    "Total number of files that failed processing"
+    "files_failed_total", "Total number of files that failed processing"
 )
 
-ACTIVE_WORKERS = gauge(
-    "active_workers",
-    "Number of currently active workers"
-)
+ACTIVE_WORKERS = gauge("active_workers", "Number of currently active workers")
 
-QUEUE_SIZE = gauge(
-    "queue_size",
-    "Current size of the task queue"
-)
+QUEUE_SIZE = gauge("queue_size", "Current size of the task queue")
 
 FILE_PROCESSING_DURATION_SECONDS = histogram(
-    "file_processing_duration_seconds",
-    "Time taken to process a single file"
+    "file_processing_duration_seconds", "Time taken to process a single file"
 )
 
 # Neo4j Batch Metrics
 NEO4J_BATCH_CREATE_TOTAL = counter(
-    "neo4j_batch_create_total",
-    "Total number of Neo4j batch operations"
+    "neo4j_batch_create_total", "Total number of Neo4j batch operations"
 )
 
 NEO4J_ENTITIES_CREATED_TOTAL = counter(
-    "neo4j_entities_created_total",
-    "Total number of entities created in Neo4j"
+    "neo4j_entities_created_total", "Total number of entities created in Neo4j"
 )
 
 NEO4J_RELATIONSHIPS_CREATED_TOTAL = counter(
     "neo4j_relationships_created_total",
-    "Total number of relationships created in Neo4j"
+    "Total number of relationships created in Neo4j",
 )
 
 NEO4J_BATCH_DURATION_SECONDS = histogram(
-    "neo4j_batch_duration_seconds",
-    "Time taken for Neo4j batch operations"
+    "neo4j_batch_duration_seconds", "Time taken for Neo4j batch operations"
 )
 
 NEO4J_RETRY_TOTAL = counter(
-    "neo4j_retry_total",
-    "Total number of Neo4j operation retries"
+    "neo4j_retry_total", "Total number of Neo4j operation retries"
 )
 
 
@@ -448,26 +454,26 @@ def print_metrics_summary():
     print(f"Uptime: {summary['uptime_seconds']:.2f}s")
     print()
 
-    if summary['counters']:
+    if summary["counters"]:
         print("Counters:")
-        for name, value in summary['counters'].items():
+        for name, value in summary["counters"].items():
             print(f"  {name}: {value}")
         print()
 
-    if summary['gauges']:
+    if summary["gauges"]:
         print("Gauges:")
-        for name, value in summary['gauges'].items():
+        for name, value in summary["gauges"].items():
             print(f"  {name}: {value}")
         print()
 
-    if summary['histograms']:
+    if summary["histograms"]:
         print("Histograms:")
-        for name, stats in summary['histograms'].items():
+        for name, stats in summary["histograms"].items():
             print(f"  {name}:")
             print(f"    Count: {stats['count']}")
             print(f"    Sum: {stats['sum']:.2f}")
             print(f"    Avg: {stats['avg']:.2f}")
-            if stats['count'] > 0:
+            if stats["count"] > 0:
                 print(f"    Min: {stats['min']:.2f}")
                 print(f"    Max: {stats['max']:.2f}")
                 print(f"    P50: {stats['p50']:.2f}")

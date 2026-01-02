@@ -7,7 +7,7 @@ of optimization features in production environments.
 
 import logging
 import os
-from typing import Dict, Any
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class FeatureFlags:
             "batching": cls.ENABLE_BATCHING,
             "neo4j_batching": cls.ENABLE_NEO4J_BATCHING,
             "parallel_workers": cls.ENABLE_PARALLEL_WORKERS,
-            "metrics": cls.ENABLE_METRICS
+            "metrics": cls.ENABLE_METRICS,
         }
 
     @classmethod
@@ -131,7 +131,9 @@ class FeatureFlags:
         elif optimization_level >= 50:
             print(f"!! Running at {optimization_level:.0f}% optimization")
         elif optimization_level > 0:
-            print(f"!! Running at {optimization_level:.0f}% optimization (degraded performance)")
+            print(
+                f"!! Running at {optimization_level:.0f}% optimization (degraded performance)"
+            )
         else:
             print("!! Running in BASELINE MODE (no optimizations)")
 

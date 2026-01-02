@@ -1,11 +1,10 @@
-# Knowledge Graph module for Cosmos DB Gremlin operations
-from .cosmos_client import (
-    CosmosGremlinClient,
-    GraphEntity,
-    GraphRelationship,
-    EntityType,
-    RelationshipType,
-    create_table_entity,
-    create_column_entity,
-    create_derives_from_relationship
-)
+"""
+Knowledge Graph module for graph database operations.
+
+This module provides clients and utilities for interacting with graph databases
+(Neo4j) to store and query data lineage relationships.
+"""
+
+from __future__ import annotations
+
+__all__: list[str] = []

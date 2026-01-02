@@ -12,8 +12,6 @@ and separates them into individual files organized by object type:
 - schemas/
 """
 
-import os
-import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -52,7 +50,7 @@ class SQLFileOrganizer:
         dialect: str = "tsql",
         add_metadata_header: bool = True,
         overwrite_existing: bool = False,
-        create_source_folders: bool = True
+        create_source_folders: bool = True,
     ):
         """
         Initialize the SQL file organizer.
@@ -75,7 +73,7 @@ class SQLFileOrganizer:
             "files_processed": 0,
             "objects_separated": 0,
             "by_type": {obj_type.value: 0 for obj_type in SQLObjectType},
-            "errors": []
+            "errors": [],
         }
 
     def create_folder_structure(self):
@@ -88,7 +86,9 @@ class SQLFileOrganizer:
 
         print("[OK] Folder structure created")
 
-    def organize_file(self, sql_file_path: str, source_folder_name: str = None) -> Dict[str, List[str]]:
+    def organize_file(
+        self, sql_file_path: str, source_folder_name: str = None
+    ) -> Dict[str, List[str]]:
         """
         Organize a single SQL file by separating its objects.
 
@@ -115,7 +115,7 @@ class SQLFileOrganizer:
 
         # Read the SQL file
         try:
-            with open(sql_file_path, 'r', encoding='utf-8') as f:
+            with open(sql_file_path, "r", encoding="utf-8") as f:
                 content = f.read()
         except Exception as e:
             error_msg = f"Error reading {sql_file_path}: {e}"
@@ -141,7 +141,9 @@ class SQLFileOrganizer:
         # Separate each object
         created_files = {}
         for obj in objects:
-            file_path = self._save_object(obj, source_file=sql_file_path.name, source_folder=source_folder_name)
+            file_path = self._save_object(
+                obj, source_file=sql_file_path.name, source_folder=source_folder_name
+            )
 
             if file_path:
                 obj_type = obj.object_type.value
@@ -152,7 +154,9 @@ class SQLFileOrganizer:
                 self.stats["objects_separated"] += 1
                 self.stats["by_type"][obj_type] += 1
 
-                print(f"  [OK] {obj.object_type.value.upper()}: {obj.name} -> {file_path}")
+                print(
+                    f"  [OK] {obj.object_type.value.upper()}: {obj.name} -> {file_path}"
+                )
 
         self.stats["files_processed"] += 1
 
@@ -205,14 +209,11 @@ class SQLFileOrganizer:
         return {
             "created_files": all_created_files,
             "manifest": manifest_path,
-            "stats": self.stats
+            "stats": self.stats,
         }
 
     def _save_object(
-        self,
-        obj: SQLObject,
-        source_file: str,
-        source_folder: str = None
+        self, obj: SQLObject, source_file: str, source_folder: str = None
     ) -> Optional[str]:
         """
         Save a SQL object to its designated folder.
@@ -251,7 +252,7 @@ class SQLFileOrganizer:
 
         # Write file
         try:
-            with open(target_path, 'w', encoding='utf-8') as f:
+            with open(target_path, "w", encoding="utf-8") as f:
                 f.write(content)
             return str(target_path.relative_to(self.output_base_dir))
         except Exception as e:
@@ -269,7 +270,9 @@ class SQLFileOrganizer:
             lines.append(f"-- Object Type: {obj.object_type.value.upper()}")
             lines.append(f"-- Object Name: {obj.get_full_name()}")
             lines.append(f"-- Source File: {source_file}")
-            lines.append(f"-- Separated On: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            lines.append(
+                f"-- Separated On: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
             lines.append(f"-- Dialect: {self.dialect}")
             lines.append("-- ============================================")
             lines.append("")
@@ -277,10 +280,10 @@ class SQLFileOrganizer:
         lines.append(obj.sql_content)
 
         # Ensure file ends with newline
-        if not obj.sql_content.endswith('\n'):
+        if not obj.sql_content.endswith("\n"):
             lines.append("")
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def _get_unique_filename(self, base_path: Path) -> Path:
         """Generate a unique filename if the base path already exists."""
@@ -303,13 +306,13 @@ class SQLFileOrganizer:
             "output_directory": str(self.output_base_dir),
             "dialect": self.dialect,
             "statistics": self.stats,
-            "files_by_type": created_files
+            "files_by_type": created_files,
         }
 
         manifest_path = self.output_base_dir / "separation_manifest.json"
 
         try:
-            with open(manifest_path, 'w', encoding='utf-8') as f:
+            with open(manifest_path, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, indent=2)
             print(f"\n[OK] Manifest created: {manifest_path}")
             return str(manifest_path)
@@ -323,18 +326,18 @@ class SQLFileOrganizer:
         print("=" * 60)
         print(f"Files Processed:     {self.stats['files_processed']}")
         print(f"Objects Separated:   {self.stats['objects_separated']}")
-        print(f"\nBy Object Type:")
+        print("\nBy Object Type:")
 
-        for obj_type, count in self.stats['by_type'].items():
+        for obj_type, count in self.stats["by_type"].items():
             if count > 0:
                 folder = self.FOLDER_MAPPING.get(SQLObjectType(obj_type), obj_type)
                 print(f"  {obj_type.upper():<20} {count:>3} -> {folder}/")
 
-        if self.stats['errors']:
+        if self.stats["errors"]:
             print(f"\n[WARN] Errors Encountered: {len(self.stats['errors'])}")
-            for error in self.stats['errors'][:5]:  # Show first 5
+            for error in self.stats["errors"][:5]:  # Show first 5
                 print(f"  - {error}")
-            if len(self.stats['errors']) > 5:
+            if len(self.stats["errors"]) > 5:
                 print(f"  ... and {len(self.stats['errors']) - 5} more")
 
         print(f"\n[OK] Output Directory: {self.output_base_dir}")
@@ -350,7 +353,7 @@ class SQLFileOrganizer:
             "files_processed": 0,
             "objects_separated": 0,
             "by_type": {obj_type.value: 0 for obj_type in SQLObjectType},
-            "errors": []
+            "errors": [],
         }
 
 
@@ -359,7 +362,7 @@ def organize_sql_files(
     output_dir: str = "./data/separated_sql",
     dialect: str = "tsql",
     pattern: str = "*.sql",
-    create_source_folders: bool = True
+    create_source_folders: bool = True,
 ) -> Dict:
     """
     Convenience function to organize SQL files.
@@ -378,7 +381,7 @@ def organize_sql_files(
         dialect=dialect,
         add_metadata_header=True,
         overwrite_existing=False,
-        create_source_folders=create_source_folders
+        create_source_folders=create_source_folders,
     )
 
     # Create folder structure
@@ -405,8 +408,7 @@ if __name__ == "__main__":
         print("=" * 60)
 
         results = organize_sql_files(
-            input_dir=input_directory,
-            output_dir=output_directory
+            input_dir=input_directory, output_dir=output_directory
         )
     else:
         print("Usage: python sql_file_organizer.py <input_dir> [output_dir]")

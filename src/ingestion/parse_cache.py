@@ -6,12 +6,10 @@ redundant parsing of unchanged files. Uses SHA-256 file hashing for cache keys.
 """
 
 import hashlib
-import json
 import logging
 import os
 import pickle
 import sqlite3
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -41,7 +39,7 @@ class ParseCache:
         self,
         cache_path: str = "data/.cache/parse_cache.db",
         max_entries: int = DEFAULT_MAX_ENTRIES,
-        ttl_days: int = DEFAULT_TTL_DAYS
+        ttl_days: int = DEFAULT_TTL_DAYS,
     ):
         """
         Initialize parse cache.
@@ -75,7 +73,8 @@ class ParseCache:
             cursor = conn.cursor()
 
             # Create cache table
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS parse_cache (
                     file_hash TEXT PRIMARY KEY,
                     parsed_result BLOB NOT NULL,
@@ -85,19 +84,24 @@ class ParseCache:
                     file_size INTEGER,
                     file_name TEXT
                 )
-            """)
+            """
+            )
 
             # Create index on last_accessed for LRU eviction
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_last_accessed
                 ON parse_cache(last_accessed)
-            """)
+            """
+            )
 
             # Create index on created_at for TTL cleanup
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_created_at
                 ON parse_cache(created_at)
-            """)
+            """
+            )
 
             conn.commit()
             logger.debug(f"Initialized parse cache database at {self.cache_path}")
@@ -117,9 +121,9 @@ class ParseCache:
         """
         sha256 = hashlib.sha256()
 
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             # Read in chunks for memory efficiency
-            for chunk in iter(lambda: f.read(8192), b''):
+            for chunk in iter(lambda: f.read(8192), b""):
                 sha256.update(chunk)
 
         return sha256.hexdigest()
@@ -142,11 +146,14 @@ class ParseCache:
                 cursor = conn.cursor()
 
                 # Get cached result
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT parsed_result, schema_version, created_at
                     FROM parse_cache
                     WHERE file_hash = ?
-                """, (file_hash,))
+                """,
+                    (file_hash,),
+                )
 
                 row = cursor.fetchone()
 
@@ -171,16 +178,21 @@ class ParseCache:
                     self._misses += 1
                     metrics.PARSE_CACHE_MISS_TOTAL.inc()
                     # Delete expired entry
-                    cursor.execute("DELETE FROM parse_cache WHERE file_hash = ?", (file_hash,))
+                    cursor.execute(
+                        "DELETE FROM parse_cache WHERE file_hash = ?", (file_hash,)
+                    )
                     conn.commit()
                     return None
 
                 # Update last_accessed
-                cursor.execute("""
+                cursor.execute(
+                    """
                     UPDATE parse_cache
                     SET last_accessed = ?
                     WHERE file_hash = ?
-                """, (datetime.now().isoformat(), file_hash))
+                """,
+                    (datetime.now().isoformat(), file_hash),
+                )
                 conn.commit()
 
                 # Deserialize result
@@ -226,20 +238,32 @@ class ParseCache:
 
                 # Insert or replace
                 now = datetime.now().isoformat()
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT OR REPLACE INTO parse_cache
                     (file_hash, parsed_result, created_at, last_accessed,
                      schema_version, file_size, file_name)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (file_hash, parsed_result_blob, now, now,
-                      self.SCHEMA_VERSION, file_size, file_name))
+                """,
+                    (
+                        file_hash,
+                        parsed_result_blob,
+                        now,
+                        now,
+                        self.SCHEMA_VERSION,
+                        file_size,
+                        file_name,
+                    ),
+                )
 
                 conn.commit()
 
                 # Check if eviction needed
                 self._evict_if_needed(cursor, conn)
 
-                logger.debug(f"Cached parse result for {file_path} (hash: {file_hash[:8]}...)")
+                logger.debug(
+                    f"Cached parse result for {file_path} (hash: {file_hash[:8]}...)"
+                )
                 return True
 
             finally:
@@ -270,14 +294,17 @@ class ParseCache:
         if count > self.max_entries:
             # Delete oldest entries (LRU)
             entries_to_delete = count - self.max_entries
-            cursor.execute("""
+            cursor.execute(
+                """
                 DELETE FROM parse_cache
                 WHERE file_hash IN (
                     SELECT file_hash FROM parse_cache
                     ORDER BY last_accessed ASC
                     LIMIT ?
                 )
-            """, (entries_to_delete,))
+            """,
+                (entries_to_delete,),
+            )
             conn.commit()
             logger.info(f"Evicted {entries_to_delete} oldest cache entries (LRU)")
 
@@ -288,11 +315,16 @@ class ParseCache:
             try:
                 cursor = conn.cursor()
 
-                cutoff_date = (datetime.now() - timedelta(days=self.ttl_days)).isoformat()
-                cursor.execute("""
+                cutoff_date = (
+                    datetime.now() - timedelta(days=self.ttl_days)
+                ).isoformat()
+                cursor.execute(
+                    """
                     DELETE FROM parse_cache
                     WHERE created_at < ?
-                """, (cutoff_date,))
+                """,
+                    (cutoff_date,),
+                )
 
                 deleted = cursor.rowcount
                 conn.commit()
@@ -346,17 +378,21 @@ class ParseCache:
             entry_count = cursor.fetchone()[0]
 
             # Get oldest entry
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT created_at FROM parse_cache
                 ORDER BY created_at ASC LIMIT 1
-            """)
+            """
+            )
             row = cursor.fetchone()
             oldest_entry = row[0] if row else None
 
             # Calculate cache size (approximate)
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT SUM(LENGTH(parsed_result)) FROM parse_cache
-            """)
+            """
+            )
             total_bytes = cursor.fetchone()[0] or 0
             cache_size_mb = total_bytes / (1024 * 1024)
 
@@ -373,7 +409,7 @@ class ParseCache:
                 "hits": self._hits,
                 "misses": self._misses,
                 "hit_rate_percent": round(hit_rate, 2),
-                "cache_path": str(self.cache_path)
+                "cache_path": str(self.cache_path),
             }
 
         finally:
@@ -394,10 +430,13 @@ class ParseCache:
             cursor = conn.cursor()
 
             # Get random sample
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT file_hash, file_name FROM parse_cache
                 ORDER BY RANDOM() LIMIT ?
-            """, (sample_size,))
+            """,
+                (sample_size,),
+            )
 
             samples = cursor.fetchall()
             verified = 0

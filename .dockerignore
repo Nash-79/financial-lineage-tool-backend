@@ -1,0 +1,98 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+docs/
+*.txt
+!requirements*.txt
+
+# Data directories (exclude from build, use volumes instead)
+data/
+data_backup*
+logs/
+*.log
+
+# Qdrant storage (use volumes)
+qdrant/storage/
+qdrant/qdrant.exe
+qdrant/qdrant.zip
+qdrant/.qdrant-initialized
+
+# Demo and test data
+demo_sql/
+tests/
+*.test.py
+
+# OpenSpec (not needed in container)
+openspec/
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Scripts (not needed in container)
+*.bat
+*.sh
+!setup-local.sh
+
+# Environment files (use environment variables instead)
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.bak
+nul
+temp/
+tmp/
+
+# Archives
+*.tar.gz
+*.zip
+*.rar
+
+# Notebooks
+notebooks/
+*.ipynb
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# OS files
+Thumbs.db
+desktop.ini

@@ -7,7 +7,6 @@ CPU-intensive regex operations.
 """
 
 import logging
-from pathlib import Path
 from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -36,7 +35,7 @@ def parse_sql_file(file_path: str) -> Dict[str, List[Dict[str, Any]]]:
         from src.parsing.code_parser import CodeParser
 
         # Read file content
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         # Initialize parser (no cache in process pool to avoid sharing issues)
@@ -48,27 +47,29 @@ def parse_sql_file(file_path: str) -> Dict[str, List[Dict[str, Any]]]:
 
         # Organize by type
         results = {
-            'tables': [],
-            'views': [],
-            'procedures': [],
-            'functions': [],
-            'triggers': []
+            "tables": [],
+            "views": [],
+            "procedures": [],
+            "functions": [],
+            "triggers": [],
         }
 
         for obj in parsed_results:
-            obj_type = obj.get('type', '').lower()
-            if obj_type == 'table':
-                results['tables'].append(obj)
-            elif obj_type == 'view':
-                results['views'].append(obj)
-            elif obj_type == 'procedure':
-                results['procedures'].append(obj)
-            elif obj_type == 'function':
-                results['functions'].append(obj)
-            elif obj_type == 'trigger':
-                results['triggers'].append(obj)
+            obj_type = obj.get("type", "").lower()
+            if obj_type == "table":
+                results["tables"].append(obj)
+            elif obj_type == "view":
+                results["views"].append(obj)
+            elif obj_type == "procedure":
+                results["procedures"].append(obj)
+            elif obj_type == "function":
+                results["functions"].append(obj)
+            elif obj_type == "trigger":
+                results["triggers"].append(obj)
 
-        logger.debug(f"Parsed {file_path}: {sum(len(v) for v in results.values())} objects")
+        logger.debug(
+            f"Parsed {file_path}: {sum(len(v) for v in results.values())} objects"
+        )
         return results
 
     except Exception as e:
@@ -93,20 +94,24 @@ def parse_sql_files_batch(file_paths: List[str]) -> List[Dict[str, Any]]:
     for file_path in file_paths:
         try:
             parsed = parse_sql_file(file_path)
-            results.append({
-                'file_path': file_path,
-                'success': True,
-                'results': parsed,
-                'error': None
-            })
+            results.append(
+                {
+                    "file_path": file_path,
+                    "success": True,
+                    "results": parsed,
+                    "error": None,
+                }
+            )
         except Exception as e:
             logger.error(f"Failed to parse {file_path}: {e}")
-            results.append({
-                'file_path': file_path,
-                'success': False,
-                'results': {},
-                'error': str(e)
-            })
+            results.append(
+                {
+                    "file_path": file_path,
+                    "success": False,
+                    "results": {},
+                    "error": str(e),
+                }
+            )
 
     return results
 

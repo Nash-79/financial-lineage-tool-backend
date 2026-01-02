@@ -26,9 +26,10 @@ AdventureWorksLT-All/
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from .enhanced_sql_parser import EnhancedSQLParser, SQLServerObject, SQLServerObjectType
+from ..utils.data_paths import DataPathManager, detect_database_name
 
 
 class HierarchicalOrganizer:
@@ -44,22 +45,37 @@ class HierarchicalOrganizer:
 
     def __init__(
         self,
-        output_base_dir: str = "./data/separated_sql",
+        output_base_dir: str = None,
+        database_name: str = None,
+        data_root: str = "./data",
         add_metadata_header: bool = True,
-        overwrite_existing: bool = False
+        overwrite_existing: bool = False,
+        use_new_structure: bool = True,
     ):
         """
         Initialize hierarchical organizer.
 
         Args:
-            output_base_dir: Base directory for output
+            output_base_dir: (Deprecated) Base directory for output. Use database_name instead.
+            database_name: Database name for new hierarchical structure
+            data_root: Root data directory (default: ./data)
             add_metadata_header: Add metadata headers to files
             overwrite_existing: Overwrite existing files
+            use_new_structure: Use new hierarchical data structure (default: True)
         """
-        self.output_base_dir = Path(output_base_dir)
         self.add_metadata_header = add_metadata_header
         self.overwrite_existing = overwrite_existing
+        self.use_new_structure = use_new_structure
+        self.data_root = data_root
+        self.database_name = database_name
         self.parser = EnhancedSQLParser()
+
+        # Backward compatibility: support old output_base_dir parameter
+        if output_base_dir:
+            self.output_base_dir = Path(output_base_dir)
+            self.use_new_structure = False
+        else:
+            self.output_base_dir = None
 
         # Statistics
         self.stats = {
@@ -68,7 +84,7 @@ class HierarchicalOrganizer:
             "tables_with_constraints": 0,
             "indexed_views": 0,
             "by_type": {},
-            "errors": []
+            "errors": [],
         }
 
     def organize_file(self, sql_file_path: str) -> Dict:
@@ -84,7 +100,6 @@ class HierarchicalOrganizer:
         print(f"\nProcessing: {sql_file_path}")
 
         sql_file_path = Path(sql_file_path)
-        source_folder_name = sql_file_path.stem
 
         if not sql_file_path.exists():
             error_msg = f"File not found: {sql_file_path}"
@@ -94,7 +109,7 @@ class HierarchicalOrganizer:
 
         # Read file
         try:
-            with open(sql_file_path, 'r', encoding='utf-8') as f:
+            with open(sql_file_path, "r", encoding="utf-8") as f:
                 content = f.read()
         except Exception as e:
             error_msg = f"Error reading {sql_file_path}: {e}"
@@ -117,9 +132,18 @@ class HierarchicalOrganizer:
 
         print(f"Found {len(objects)} object(s)")
 
-        # Create source folder
-        source_dir = self.output_base_dir / source_folder_name
-        source_dir.mkdir(parents=True, exist_ok=True)
+        # Determine output directory
+        if self.use_new_structure:
+            # Use new hierarchical structure
+            db_name = self.database_name or detect_database_name(sql_file_path)
+            paths = DataPathManager(self.data_root, db_name)
+            source_dir = paths.get_category_path("separated")
+            print(f"Using database: {db_name}")
+        else:
+            # Use old structure (backward compatibility)
+            source_folder_name = sql_file_path.stem
+            source_dir = self.output_base_dir / source_folder_name
+            source_dir.mkdir(parents=True, exist_ok=True)
 
         # Organize objects hierarchically
         created_files = {}
@@ -129,7 +153,9 @@ class HierarchicalOrganizer:
 
         for obj in standalone_objects:
 
-            files = self._save_object_hierarchically(obj, source_dir, sql_file_path.name)
+            files = self._save_object_hierarchically(
+                obj, source_dir, sql_file_path.name
+            )
 
             # Track created files
             for file_path in files:
@@ -139,7 +165,9 @@ class HierarchicalOrganizer:
                 created_files[obj_type].append(file_path)
 
                 self.stats["objects_separated"] += 1
-                self.stats["by_type"][obj_type] = self.stats["by_type"].get(obj_type, 0) + 1
+                self.stats["by_type"][obj_type] = (
+                    self.stats["by_type"].get(obj_type, 0) + 1
+                )
 
         self.stats["files_processed"] += 1
 
@@ -148,7 +176,9 @@ class HierarchicalOrganizer:
 
         return created_files
 
-    def _get_standalone_objects(self, objects: List[SQLServerObject]) -> List[SQLServerObject]:
+    def _get_standalone_objects(
+        self, objects: List[SQLServerObject]
+    ) -> List[SQLServerObject]:
         """
         Get objects that should be saved as standalone (not grouped with parent).
 
@@ -165,7 +195,7 @@ class HierarchicalOrganizer:
                     SQLServerObjectType.CONSTRAINT,
                     SQLServerObjectType.FOREIGN_KEY,
                     SQLServerObjectType.CHECK_CONSTRAINT,
-                    SQLServerObjectType.PRIMARY_KEY
+                    SQLServerObjectType.PRIMARY_KEY,
                 ]:
                     # This object will be saved with its parent
                     continue
@@ -176,10 +206,7 @@ class HierarchicalOrganizer:
         return standalone
 
     def _save_object_hierarchically(
-        self,
-        obj: SQLServerObject,
-        source_dir: Path,
-        source_file: str
+        self, obj: SQLServerObject, source_dir: Path, source_file: str
     ) -> List[str]:
         """
         Save object and its related objects hierarchically.
@@ -220,7 +247,9 @@ class HierarchicalOrganizer:
         self._write_file(main_file, content)
         created_files.append(str(main_file.relative_to(self.output_base_dir)))
 
-        print(f"  [OK] {obj.object_type.value}: {obj.name} -> {main_file.relative_to(source_dir)}")
+        print(
+            f"  [OK] {obj.object_type.value}: {obj.name} -> {main_file.relative_to(source_dir)}"
+        )
 
         # Save related objects in subfolders
         if obj.indexes:
@@ -228,7 +257,9 @@ class HierarchicalOrganizer:
             idx_dir.mkdir(exist_ok=True)
             for idx in obj.indexes:
                 idx_file = idx_dir / f"{idx.name}.sql"
-                idx_content = self._prepare_content(idx, source_file, parent_name=obj.name)
+                idx_content = self._prepare_content(
+                    idx, source_file, parent_name=obj.name
+                )
                 self._write_file(idx_file, idx_content)
                 created_files.append(str(idx_file.relative_to(self.output_base_dir)))
                 print(f"    [OK] Index: {idx.name}")
@@ -237,8 +268,13 @@ class HierarchicalOrganizer:
             fk_dir = object_dir / "foreign_keys"
             fk_dir.mkdir(exist_ok=True)
             for fk in obj.foreign_keys:
-                fk_file = fk_dir / f"{fk.name if hasattr(fk, 'name') and fk.name else 'FK'}.sql"
-                fk_content = self._prepare_content(fk, source_file, parent_name=obj.name)
+                fk_file = (
+                    fk_dir
+                    / f"{fk.name if hasattr(fk, 'name') and fk.name else 'FK'}.sql"
+                )
+                fk_content = self._prepare_content(
+                    fk, source_file, parent_name=obj.name
+                )
                 self._write_file(fk_file, fk_content)
                 created_files.append(str(fk_file.relative_to(self.output_base_dir)))
 
@@ -246,8 +282,13 @@ class HierarchicalOrganizer:
             chk_dir = object_dir / "check_constraints"
             chk_dir.mkdir(exist_ok=True)
             for chk in obj.check_constraints:
-                chk_file = chk_dir / f"{chk.name if hasattr(chk, 'name') and chk.name else 'CHK'}.sql"
-                chk_content = self._prepare_content(chk, source_file, parent_name=obj.name)
+                chk_file = (
+                    chk_dir
+                    / f"{chk.name if hasattr(chk, 'name') and chk.name else 'CHK'}.sql"
+                )
+                chk_content = self._prepare_content(
+                    chk, source_file, parent_name=obj.name
+                )
                 self._write_file(chk_file, chk_content)
                 created_files.append(str(chk_file.relative_to(self.output_base_dir)))
 
@@ -255,8 +296,13 @@ class HierarchicalOrganizer:
             def_dir = object_dir / "defaults"
             def_dir.mkdir(exist_ok=True)
             for df in obj.defaults:
-                df_file = def_dir / f"{df.name if hasattr(df, 'name') and df.name else 'DF'}.sql"
-                df_content = self._prepare_content(df, source_file, parent_name=obj.name)
+                df_file = (
+                    def_dir
+                    / f"{df.name if hasattr(df, 'name') and df.name else 'DF'}.sql"
+                )
+                df_content = self._prepare_content(
+                    df, source_file, parent_name=obj.name
+                )
                 self._write_file(df_file, df_content)
                 created_files.append(str(df_file.relative_to(self.output_base_dir)))
 
@@ -264,13 +310,20 @@ class HierarchicalOrganizer:
             con_dir = object_dir / "constraints"
             con_dir.mkdir(exist_ok=True)
             for con in obj.constraints:
-                con_file = con_dir / f"{con.name if hasattr(con, 'name') and con.name else 'CON'}.sql"
-                con_content = self._prepare_content(con, source_file, parent_name=obj.name)
+                con_file = (
+                    con_dir
+                    / f"{con.name if hasattr(con, 'name') and con.name else 'CON'}.sql"
+                )
+                con_content = self._prepare_content(
+                    con, source_file, parent_name=obj.name
+                )
                 self._write_file(con_file, con_content)
                 created_files.append(str(con_file.relative_to(self.output_base_dir)))
 
         # Track special cases
-        if obj.object_type == SQLServerObjectType.TABLE and (obj.indexes or obj.foreign_keys or obj.constraints):
+        if obj.object_type == SQLServerObjectType.TABLE and (
+            obj.indexes or obj.foreign_keys or obj.constraints
+        ):
             self.stats["tables_with_constraints"] += 1
 
         if obj.object_type == SQLServerObjectType.VIEW and obj.indexes:
@@ -283,7 +336,7 @@ class HierarchicalOrganizer:
         obj: SQLServerObject,
         source_file: str,
         is_main: bool = False,
-        parent_name: str = None
+        parent_name: str = None,
     ) -> str:
         """Prepare file content with metadata."""
         lines = []
@@ -294,27 +347,31 @@ class HierarchicalOrganizer:
             if is_main:
                 lines.append(f"-- Object Name: {obj.full_name}")
             else:
-                lines.append(f"-- Constraint/Index Name: {getattr(obj, 'name', 'Unknown')}")
+                lines.append(
+                    f"-- Constraint/Index Name: {getattr(obj, 'name', 'Unknown')}"
+                )
                 if parent_name:
                     lines.append(f"-- Parent Object: {parent_name}")
             lines.append(f"-- Source File: {source_file}")
             if obj.script_date:
                 lines.append(f"-- Script Date: {obj.script_date}")
-            lines.append(f"-- Separated On: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            lines.append(
+                f"-- Separated On: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
             lines.append("-- ============================================")
             lines.append("")
 
         lines.append(obj.sql_content.strip())
 
-        if not obj.sql_content.strip().endswith('\n'):
+        if not obj.sql_content.strip().endswith("\n"):
             lines.append("")
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def _write_file(self, file_path: Path, content: str):
         """Write content to file."""
         try:
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
         except Exception as e:
             error_msg = f"Error writing {file_path}: {e}"
@@ -331,15 +388,15 @@ class HierarchicalOrganizer:
                 "objects_separated": self.stats["objects_separated"],
                 "tables_with_constraints": self.stats["tables_with_constraints"],
                 "indexed_views": self.stats["indexed_views"],
-                "by_type": self.stats["by_type"]
+                "by_type": self.stats["by_type"],
             },
-            "files_by_type": created_files
+            "files_by_type": created_files,
         }
 
         manifest_path = source_dir / "organization_manifest.json"
 
         try:
-            with open(manifest_path, 'w', encoding='utf-8') as f:
+            with open(manifest_path, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, indent=2)
             print(f"\n[OK] Manifest created: {manifest_path}")
         except Exception as e:
@@ -355,14 +412,14 @@ class HierarchicalOrganizer:
         print(f"Tables with Constraints:  {self.stats['tables_with_constraints']}")
         print(f"Indexed Views:            {self.stats['indexed_views']}")
 
-        print(f"\nBy Object Type:")
-        for obj_type, count in self.stats['by_type'].items():
+        print("\nBy Object Type:")
+        for obj_type, count in self.stats["by_type"].items():
             if count > 0:
                 print(f"  {obj_type:<20} {count:>3}")
 
-        if self.stats['errors']:
+        if self.stats["errors"]:
             print(f"\n[WARN] Errors: {len(self.stats['errors'])}")
-            for error in self.stats['errors'][:5]:
+            for error in self.stats["errors"][:5]:
                 print(f"  - {error}")
 
         print(f"\n[OK] Output Directory: {self.output_base_dir}")
@@ -370,8 +427,7 @@ class HierarchicalOrganizer:
 
 
 def organize_sql_hierarchically(
-    input_file: str,
-    output_dir: str = "./data/separated_sql"
+    input_file: str, output_dir: str = "./data/separated_sql"
 ) -> Dict:
     """
     Convenience function to organize SQL file hierarchically.
@@ -384,9 +440,7 @@ def organize_sql_hierarchically(
         Organization results
     """
     organizer = HierarchicalOrganizer(
-        output_base_dir=output_dir,
-        add_metadata_header=True,
-        overwrite_existing=True
+        output_base_dir=output_dir, add_metadata_header=True, overwrite_existing=True
     )
 
     results = organizer.organize_file(input_file)

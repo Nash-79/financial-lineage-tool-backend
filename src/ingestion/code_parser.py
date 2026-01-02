@@ -9,6 +9,7 @@ from sqlglot import parse_one
 import ast
 import json
 
+
 class CodeParser:
     """
     Parses code to extract metadata, dependencies, and lineage.
@@ -47,51 +48,57 @@ class CodeParser:
                     result["views"].add(ast.this.sql())
                     result["write"] = ast.this.sql()
                 elif kind in ("FUNCTION", "PROCEDURE"):
-                     result["functions_and_procedures"].add(ast.this.sql())
+                    result["functions_and_procedures"].add(ast.this.sql())
                 elif isinstance(ast.this, exp.Table):
                     result["write"] = ast.this.sql()
-
 
             # Find all tables being read from
             for table in ast.find_all(exp.Table):
                 # Ensure we don't add the write table to the read list
                 if table.sql() != result["write"]:
                     result["read"].add(table.sql())
-            
+
             # Extract column level lineage if it's a SELECT statement
-            if hasattr(ast, 'expression') and isinstance(ast.expression, exp.Select):
+            if hasattr(ast, "expression") and isinstance(ast.expression, exp.Select):
                 select_expression = ast.expression
                 for projection in select_expression.find_all(exp.Alias):
                     target_col = projection.this
                     lineage = projection.expression.lineage()
-                    
+
                     source_cols = {col.sql() for col in lineage.find_all(exp.Column)}
-                    
-                    result["columns"].append({
-                        "target": target_col.sql(),
-                        "sources": list(source_cols),
-                        "transformation": projection.expression.sql(dialect=dialect)
-                    })
+
+                    result["columns"].append(
+                        {
+                            "target": target_col.sql(),
+                            "sources": list(source_cols),
+                            "transformation": projection.expression.sql(
+                                dialect=dialect
+                            ),
+                        }
+                    )
                 # Handle columns without aliases
                 for col in select_expression.selects:
                     if not isinstance(col, exp.Alias):
                         lineage = col.lineage()
                         source_cols = {c.sql() for c in lineage.find_all(exp.Column)}
-                        result["columns"].append({
-                            "target": col.this.sql(),
-                            "sources": list(source_cols),
-                            "transformation": col.sql(dialect=dialect)
-                        })
+                        result["columns"].append(
+                            {
+                                "target": col.this.sql(),
+                                "sources": list(source_cols),
+                                "transformation": col.sql(dialect=dialect),
+                            }
+                        )
 
             # Convert sets to lists for JSON serialization
             result["read"] = list(result["read"])
-            result["functions_and_procedures"] = list(result["functions_and_procedures"])
+            result["functions_and_procedures"] = list(
+                result["functions_and_procedures"]
+            )
             result["views"] = list(result["views"])
-            
+
             # If no specific write table, it might just be a select query
             if not result["write"] and (result["read"] or result["columns"]):
-                result['write'] = 'console'
-
+                result["write"] = "console"
 
             return result
 
@@ -116,25 +123,31 @@ class CodeParser:
                 "classes": [],
                 "functions": [],
                 "imports": [],
-                "docstring": ast.get_docstring(tree)
+                "docstring": ast.get_docstring(tree),
             }
 
             for node in ast.walk(tree):
                 if isinstance(node, ast.ClassDef):
-                    result["classes"].append({
-                        "name": node.name,
-                        "docstring": ast.get_docstring(node),
-                        "bases": [b.id for b in node.bases if isinstance(b, ast.Name)]
-                    })
+                    result["classes"].append(
+                        {
+                            "name": node.name,
+                            "docstring": ast.get_docstring(node),
+                            "bases": [
+                                b.id for b in node.bases if isinstance(b, ast.Name)
+                            ],
+                        }
+                    )
                 elif isinstance(node, ast.FunctionDef):
                     # We might want to track which class a method belongs to
                     # usage of 'ast.walk' flatly visits all nodes.
                     # For simple lineage, flat list of functions is okay for now.
-                    result["functions"].append({
-                        "name": node.name,
-                        "docstring": ast.get_docstring(node),
-                        "args": [arg.arg for arg in node.args.args]
-                    })
+                    result["functions"].append(
+                        {
+                            "name": node.name,
+                            "docstring": ast.get_docstring(node),
+                            "args": [arg.arg for arg in node.args.args],
+                        }
+                    )
                 elif isinstance(node, ast.Import):
                     for alias in node.names:
                         result["imports"].append(alias.name)
@@ -160,11 +173,7 @@ class CodeParser:
         """
         try:
             data = json.loads(json_content)
-            result = {
-                "type": type(data).__name__,
-                "keys": [],
-                "array_length": 0
-            }
+            result = {"type": type(data).__name__, "keys": [], "array_length": 0}
 
             if isinstance(data, dict):
                 result["keys"] = list(data.keys())
@@ -179,7 +188,8 @@ class CodeParser:
             print(f"Error parsing JSON: {e}")
             return None
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Example Usage
     parser = CodeParser()
     import json
@@ -227,7 +237,7 @@ if __name__ == '__main__':
     """
     lineage3 = parser.parse_sql(sql3, dialect="tsql")
     print_json(lineage3)
-    
+
     print("\n--- Example 4: CREATE PROCEDURE ---")
     sql4 = """
     CREATE OR ALTER PROCEDURE dbo.usp_update_stock
@@ -243,7 +253,7 @@ if __name__ == '__main__':
     """
     lineage4 = parser.parse_sql(sql4, dialect="tsql")
     print_json(lineage4)
-    
+
     print("\n--- Example 5: Simple SELECT with transformation ---")
     sql5 = """
     SELECT

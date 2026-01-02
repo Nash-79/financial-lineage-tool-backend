@@ -1,9 +1,0 @@
--- ============================================
--- Object Type: TABLE
--- Object Name: 
--- Source File: sample_financial_schema.sql
--- Separated On: 2025-12-08 18:54:04
--- Dialect: tsql
--- ============================================
-
-/* Source: Raw transaction data */ CREATE TABLE raw.transactions (transaction_id INTEGER PRIMARY KEY, customer_id INTEGER, transaction_date ROWVERSION, amount NUMERIC(18, 2), currency VARCHAR(3), status VARCHAR(20), FOREIGN KEY (customer_id) REFERENCES raw.customers (customer_id))

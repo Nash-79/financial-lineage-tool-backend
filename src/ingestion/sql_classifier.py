@@ -9,12 +9,12 @@ import re
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, List
-import sqlglot
 from sqlglot import exp, parse
 
 
 class SQLObjectType(str, Enum):
     """Types of SQL database objects."""
+
     TABLE = "table"
     VIEW = "view"
     FUNCTION = "function"
@@ -28,6 +28,7 @@ class SQLObjectType(str, Enum):
 @dataclass
 class SQLObject:
     """Represents a classified SQL object."""
+
     object_type: SQLObjectType
     name: str
     schema: Optional[str] = None
@@ -49,7 +50,7 @@ class SQLObject:
     def get_filename(self) -> str:
         """Generate a safe filename for this object."""
         # Use simple name, make it filesystem-safe
-        safe_name = re.sub(r'[^\w\-_.]', '_', self.name)
+        safe_name = re.sub(r"[^\w\-_.]", "_", self.name)
         return f"{safe_name}.sql"
 
 
@@ -147,60 +148,60 @@ class SQLClassifier:
         """Extract table information."""
         table_name = stmt.this
 
-        name = table_name.name if hasattr(table_name, 'name') else str(table_name)
-        schema = table_name.db if hasattr(table_name, 'db') else None
-        database = table_name.catalog if hasattr(table_name, 'catalog') else None
+        name = table_name.name if hasattr(table_name, "name") else str(table_name)
+        schema = table_name.db if hasattr(table_name, "db") else None
+        database = table_name.catalog if hasattr(table_name, "catalog") else None
 
         return SQLObject(
             object_type=SQLObjectType.TABLE,
             name=name,
             schema=schema,
             database=database,
-            sql_content=stmt.sql(dialect=self.dialect)
+            sql_content=stmt.sql(dialect=self.dialect),
         )
 
     def _extract_view(self, stmt: exp.Create) -> SQLObject:
         """Extract view information."""
         view_name = stmt.this
 
-        name = view_name.name if hasattr(view_name, 'name') else str(view_name)
-        schema = view_name.db if hasattr(view_name, 'db') else None
-        database = view_name.catalog if hasattr(view_name, 'catalog') else None
+        name = view_name.name if hasattr(view_name, "name") else str(view_name)
+        schema = view_name.db if hasattr(view_name, "db") else None
+        database = view_name.catalog if hasattr(view_name, "catalog") else None
 
         return SQLObject(
             object_type=SQLObjectType.VIEW,
             name=name,
             schema=schema,
             database=database,
-            sql_content=stmt.sql(dialect=self.dialect)
+            sql_content=stmt.sql(dialect=self.dialect),
         )
 
     def _extract_function(self, stmt: exp.Create) -> SQLObject:
         """Extract function information."""
         func_name = stmt.this
 
-        name = func_name.name if hasattr(func_name, 'name') else str(func_name)
-        schema = func_name.db if hasattr(func_name, 'db') else None
+        name = func_name.name if hasattr(func_name, "name") else str(func_name)
+        schema = func_name.db if hasattr(func_name, "db") else None
 
         return SQLObject(
             object_type=SQLObjectType.FUNCTION,
             name=name,
             schema=schema,
-            sql_content=stmt.sql(dialect=self.dialect)
+            sql_content=stmt.sql(dialect=self.dialect),
         )
 
     def _extract_procedure(self, stmt: exp.Create) -> SQLObject:
         """Extract procedure information."""
         proc_name = stmt.this
 
-        name = proc_name.name if hasattr(proc_name, 'name') else str(proc_name)
-        schema = proc_name.db if hasattr(proc_name, 'db') else None
+        name = proc_name.name if hasattr(proc_name, "name") else str(proc_name)
+        schema = proc_name.db if hasattr(proc_name, "db") else None
 
         return SQLObject(
             object_type=SQLObjectType.PROCEDURE,
             name=name,
             schema=schema,
-            sql_content=stmt.sql(dialect=self.dialect)
+            sql_content=stmt.sql(dialect=self.dialect),
         )
 
     def _extract_index(self, stmt: exp.Create) -> SQLObject:
@@ -208,7 +209,7 @@ class SQLClassifier:
         return SQLObject(
             object_type=SQLObjectType.INDEX,
             name=str(stmt.this),
-            sql_content=stmt.sql(dialect=self.dialect)
+            sql_content=stmt.sql(dialect=self.dialect),
         )
 
     def _extract_schema(self, stmt: exp.Create) -> SQLObject:
@@ -216,7 +217,7 @@ class SQLClassifier:
         return SQLObject(
             object_type=SQLObjectType.SCHEMA,
             name=str(stmt.this),
-            sql_content=stmt.sql(dialect=self.dialect)
+            sql_content=stmt.sql(dialect=self.dialect),
         )
 
     def _classify_with_regex(self, content: str) -> List[SQLObject]:
@@ -228,13 +229,13 @@ class SQLClassifier:
 
         # Patterns for different object types
         patterns = {
-            SQLObjectType.TABLE: r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)',
-            SQLObjectType.VIEW: r'CREATE\s+(?:OR\s+(?:ALTER|REPLACE)\s+)?VIEW\s+([^\s(]+)',
-            SQLObjectType.FUNCTION: r'CREATE\s+(?:OR\s+(?:ALTER|REPLACE)\s+)?FUNCTION\s+([^\s(]+)',
-            SQLObjectType.PROCEDURE: r'CREATE\s+(?:OR\s+(?:ALTER|REPLACE)\s+)?(?:PROCEDURE|PROC)\s+([^\s(]+)',
-            SQLObjectType.TRIGGER: r'CREATE\s+(?:OR\s+(?:ALTER|REPLACE)\s+)?TRIGGER\s+([^\s(]+)',
-            SQLObjectType.INDEX: r'CREATE\s+(?:UNIQUE\s+)?INDEX\s+([^\s(]+)',
-            SQLObjectType.SCHEMA: r'CREATE\s+SCHEMA\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s;]+)',
+            SQLObjectType.TABLE: r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)",
+            SQLObjectType.VIEW: r"CREATE\s+(?:OR\s+(?:ALTER|REPLACE)\s+)?VIEW\s+([^\s(]+)",
+            SQLObjectType.FUNCTION: r"CREATE\s+(?:OR\s+(?:ALTER|REPLACE)\s+)?FUNCTION\s+([^\s(]+)",
+            SQLObjectType.PROCEDURE: r"CREATE\s+(?:OR\s+(?:ALTER|REPLACE)\s+)?(?:PROCEDURE|PROC)\s+([^\s(]+)",
+            SQLObjectType.TRIGGER: r"CREATE\s+(?:OR\s+(?:ALTER|REPLACE)\s+)?TRIGGER\s+([^\s(]+)",
+            SQLObjectType.INDEX: r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+([^\s(]+)",
+            SQLObjectType.SCHEMA: r"CREATE\s+SCHEMA\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s;]+)",
         }
 
         for obj_type, pattern in patterns.items():
@@ -243,7 +244,7 @@ class SQLClassifier:
                 full_name = match.group(1).strip()
 
                 # Extract schema and name
-                parts = full_name.split('.')
+                parts = full_name.split(".")
                 if len(parts) == 3:
                     database, schema, name = parts
                 elif len(parts) == 2:
@@ -257,22 +258,24 @@ class SQLClassifier:
                 # Find the full statement
                 sql_content = self._extract_statement(content, match.start())
 
-                objects.append(SQLObject(
-                    object_type=obj_type,
-                    name=name,
-                    schema=schema,
-                    database=database,
-                    sql_content=sql_content
-                ))
+                objects.append(
+                    SQLObject(
+                        object_type=obj_type,
+                        name=name,
+                        schema=schema,
+                        database=database,
+                        sql_content=sql_content,
+                    )
+                )
 
         return objects
 
     def _remove_comments(self, sql: str) -> str:
         """Remove SQL comments."""
         # Remove single-line comments
-        sql = re.sub(r'--[^\n]*', '', sql)
+        sql = re.sub(r"--[^\n]*", "", sql)
         # Remove multi-line comments
-        sql = re.sub(r'/\*.*?\*/', '', sql, flags=re.DOTALL)
+        sql = re.sub(r"/\*.*?\*/", "", sql, flags=re.DOTALL)
         return sql
 
     def _extract_statement(self, content: str, start_pos: int) -> str:
@@ -285,10 +288,10 @@ class SQLClassifier:
         remaining = content[start_pos:]
 
         # Look for semicolon
-        semicolon_pos = remaining.find(';')
+        semicolon_pos = remaining.find(";")
 
         # Look for GO (T-SQL batch separator)
-        go_match = re.search(r'\bGO\b', remaining, re.IGNORECASE)
+        go_match = re.search(r"\bGO\b", remaining, re.IGNORECASE)
         go_pos = go_match.start() if go_match else -1
 
         # Use whichever comes first
@@ -302,7 +305,7 @@ class SQLClassifier:
             # No clear ending, take rest of file
             end_pos = len(remaining)
 
-        statement = remaining[:end_pos + 1].strip()
+        statement = remaining[: end_pos + 1].strip()
         return statement
 
     def classify_single_statement(self, sql_statement: str) -> SQLObject:
@@ -322,9 +325,7 @@ class SQLClassifier:
 
         # Return unknown if classification fails
         return SQLObject(
-            object_type=SQLObjectType.UNKNOWN,
-            name="unknown",
-            sql_content=sql_statement
+            object_type=SQLObjectType.UNKNOWN, name="unknown", sql_content=sql_statement
         )
 
 

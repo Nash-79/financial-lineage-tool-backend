@@ -7,11 +7,8 @@ and improve efficiency when watching for file changes.
 
 import asyncio
 import logging
-import os
 import time
-from pathlib import Path
 from typing import Callable, Set, Optional, Dict, Any
-from datetime import datetime
 
 from src.utils import metrics
 
@@ -35,7 +32,7 @@ class BatchProcessor:
         process_callback: Callable,
         debounce_window: float = 5.0,
         batch_size_threshold: int = 50,
-        enable_batching: bool = True
+        enable_batching: bool = True,
     ):
         """
         Initialize BatchProcessor.
@@ -85,7 +82,9 @@ class BatchProcessor:
         self._event_timestamps[file_path] = current_time
         self._last_event_time = current_time
 
-        logger.debug(f"Event added: {file_path} (queue size: {len(self._pending_files)})")
+        logger.debug(
+            f"Event added: {file_path} (queue size: {len(self._pending_files)})"
+        )
 
         if not self.enable_batching:
             # Immediate processing mode
@@ -178,7 +177,9 @@ class BatchProcessor:
             duration = time.time() - start_time
             metrics.BATCH_PROCESSING_DURATION_SECONDS.observe(duration)
 
-            logger.info(f"Successfully processed batch of {file_count} files in {duration:.2f}s")
+            logger.info(
+                f"Successfully processed batch of {file_count} files in {duration:.2f}s"
+            )
 
         except Exception as e:
             logger.error(f"Error processing batch of {file_count} files: {e}")
@@ -198,11 +199,12 @@ class BatchProcessor:
             "batches_processed": self._batches_processed,
             "deduplication_rate_percent": (
                 round(self._events_deduplicated / self._events_received * 100, 2)
-                if self._events_received > 0 else 0
+                if self._events_received > 0
+                else 0
             ),
             "debounce_window_seconds": self.debounce_window,
             "batch_size_threshold": self.batch_size_threshold,
-            "batching_enabled": self.enable_batching
+            "batching_enabled": self.enable_batching,
         }
 
     async def shutdown(self):
@@ -230,9 +232,7 @@ async def example_callback(file_paths):
 async def main():
     """Example usage of BatchProcessor."""
     processor = BatchProcessor(
-        process_callback=example_callback,
-        debounce_window=2.0,
-        batch_size_threshold=5
+        process_callback=example_callback, debounce_window=2.0, batch_size_threshold=5
     )
 
     # Simulate file events

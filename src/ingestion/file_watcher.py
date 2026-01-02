@@ -17,8 +17,7 @@ Usage:
 
 import time
 from pathlib import Path
-from typing import Optional, Set
-from datetime import datetime
+from typing import Set
 import logging
 
 try:
@@ -33,8 +32,7 @@ from .hierarchical_organizer import HierarchicalOrganizer
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -46,11 +44,7 @@ class SQLFileHandler(FileSystemEventHandler):
     Processes .sql files when they are created or modified.
     """
 
-    def __init__(
-        self,
-        organizer: HierarchicalOrganizer,
-        debounce_seconds: float = 2.0
-    ):
+    def __init__(self, organizer: HierarchicalOrganizer, debounce_seconds: float = 2.0):
         """
         Initialize SQL file handler.
 
@@ -65,13 +59,13 @@ class SQLFileHandler(FileSystemEventHandler):
 
     def on_created(self, event: FileSystemEvent):
         """Handle file creation events."""
-        if not event.is_directory and event.src_path.endswith('.sql'):
+        if not event.is_directory and event.src_path.endswith(".sql"):
             logger.info(f"[NEW FILE] Detected: {event.src_path}")
             self._process_file(event.src_path)
 
     def on_modified(self, event: FileSystemEvent):
         """Handle file modification events."""
-        if not event.is_directory and event.src_path.endswith('.sql'):
+        if not event.is_directory and event.src_path.endswith(".sql"):
             # Check if we recently processed this file (debounce)
             if self._should_process(event.src_path):
                 logger.info(f"[MODIFIED] Detected: {event.src_path}")
@@ -120,7 +114,9 @@ class SQLFileHandler(FileSystemEventHandler):
 
             if results:
                 logger.info(f"[OK] Successfully processed: {Path(file_path).name}")
-                logger.info(f"[OK] Created {sum(len(v) for v in results.values())} files")
+                logger.info(
+                    f"[OK] Created {sum(len(v) for v in results.values())} files"
+                )
             else:
                 logger.warning(f"[WARN] No objects found in: {Path(file_path).name}")
 
@@ -145,7 +141,7 @@ class SQLFileWatcher:
         output_dir: str = "./data/separated_sql",
         add_metadata: bool = True,
         overwrite_existing: bool = True,
-        debounce_seconds: float = 2.0
+        debounce_seconds: float = 2.0,
     ):
         """
         Initialize file watcher.
@@ -168,24 +164,19 @@ class SQLFileWatcher:
         self.organizer = HierarchicalOrganizer(
             output_base_dir=str(self.output_dir),
             add_metadata_header=add_metadata,
-            overwrite_existing=overwrite_existing
+            overwrite_existing=overwrite_existing,
         )
 
         # Initialize file handler
         self.event_handler = SQLFileHandler(
-            organizer=self.organizer,
-            debounce_seconds=debounce_seconds
+            organizer=self.organizer, debounce_seconds=debounce_seconds
         )
 
         # Initialize observer
         self.observer = Observer()
-        self.observer.schedule(
-            self.event_handler,
-            str(self.watch_dir),
-            recursive=False
-        )
+        self.observer.schedule(self.event_handler, str(self.watch_dir), recursive=False)
 
-        logger.info(f"[INIT] File watcher initialized")
+        logger.info("[INIT] File watcher initialized")
         logger.info(f"[INIT] Watching: {self.watch_dir.absolute()}")
         logger.info(f"[INIT] Output: {self.output_dir.absolute()}")
 
@@ -257,7 +248,7 @@ class SQLFileWatcher:
 def start_watcher(
     watch_dir: str = "./data/raw",
     output_dir: str = "./data/separated_sql",
-    process_existing: bool = True
+    process_existing: bool = True,
 ):
     """
     Convenience function to start SQL file watcher.
@@ -267,10 +258,7 @@ def start_watcher(
         output_dir: Output directory
         process_existing: Process existing files on startup
     """
-    watcher = SQLFileWatcher(
-        watch_dir=watch_dir,
-        output_dir=output_dir
-    )
+    watcher = SQLFileWatcher(watch_dir=watch_dir, output_dir=output_dir)
 
     watcher.start(process_existing=process_existing)
 

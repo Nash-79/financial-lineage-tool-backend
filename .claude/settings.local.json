@@ -5,7 +5,15 @@
       "Bash(python -m pytest:*)",
       "Bash(python:*)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(openspec list:*)",
+      "Bash(docker compose:*)",
+      "Bash(time curl:*)",
+      "Bash(curl:*)",
+      "Bash(ping:*)",
+      "Bash(openspec show:*)",
+      "Skill(openspec:proposal)",
+      "Skill(openspec:proposal:*)"
     ]
   }
 }

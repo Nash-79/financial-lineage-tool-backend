@@ -35,7 +35,7 @@ class AsyncSQLFileHandler(FileSystemEventHandler):
         self,
         batch_processor: BatchProcessor,
         organizer: HierarchicalOrganizer,
-        enable_batching: bool = True
+        enable_batching: bool = True,
     ):
         """
         Initialize async SQL file handler.
@@ -56,13 +56,13 @@ class AsyncSQLFileHandler(FileSystemEventHandler):
 
     def on_created(self, event: FileSystemEvent):
         """Handle file creation events."""
-        if not event.is_directory and event.src_path.endswith('.sql'):
+        if not event.is_directory and event.src_path.endswith(".sql"):
             logger.info(f"[NEW FILE] Detected: {event.src_path}")
             self._queue_file(event.src_path)
 
     def on_modified(self, event: FileSystemEvent):
         """Handle file modification events."""
-        if not event.is_directory and event.src_path.endswith('.sql'):
+        if not event.is_directory and event.src_path.endswith(".sql"):
             logger.info(f"[MODIFIED] Detected: {event.src_path}")
             self._queue_file(event.src_path)
 
@@ -76,8 +76,7 @@ class AsyncSQLFileHandler(FileSystemEventHandler):
         if self.event_loop and not self.event_loop.is_closed():
             # Schedule file processing in the event loop
             asyncio.run_coroutine_threadsafe(
-                self.batch_processor.add_event(file_path),
-                self.event_loop
+                self.batch_processor.add_event(file_path), self.event_loop
             )
 
 
@@ -100,7 +99,7 @@ class AsyncSQLFileWatcher:
         overwrite_existing: bool = True,
         enable_batching: bool = True,
         debounce_window: float = 5.0,
-        batch_size_threshold: int = 50
+        batch_size_threshold: int = 50,
     ):
         """
         Initialize async file watcher.
@@ -126,7 +125,7 @@ class AsyncSQLFileWatcher:
         self.organizer = HierarchicalOrganizer(
             output_base_dir=str(self.output_dir),
             add_metadata_header=add_metadata,
-            overwrite_existing=overwrite_existing
+            overwrite_existing=overwrite_existing,
         )
 
         # Initialize batch processor
@@ -142,7 +141,7 @@ class AsyncSQLFileWatcher:
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self._shutdown_event = asyncio.Event()
 
-        logger.info(f"[INIT] Async file watcher initialized")
+        logger.info("[INIT] Async file watcher initialized")
         logger.info(f"[INIT] Watching: {self.watch_dir.absolute()}")
         logger.info(f"[INIT] Output: {self.output_dir.absolute()}")
         logger.info(f"[INIT] Batching: {'Enabled' if enable_batching else 'Disabled'}")
@@ -163,14 +162,14 @@ class AsyncSQLFileWatcher:
             # Run in executor to avoid blocking
             loop = asyncio.get_event_loop()
             results = await loop.run_in_executor(
-                None,
-                self.organizer.organize_file,
-                file_path
+                None, self.organizer.organize_file, file_path
             )
 
             if results:
                 logger.info(f"[OK] Successfully processed: {Path(file_path).name}")
-                logger.info(f"[OK] Created {sum(len(v) for v in results.values())} files")
+                logger.info(
+                    f"[OK] Created {sum(len(v) for v in results.values())} files"
+                )
             else:
                 logger.warning(f"[WARN] No objects found in: {Path(file_path).name}")
 
@@ -213,24 +212,20 @@ class AsyncSQLFileWatcher:
             process_callback=self._process_batch,
             debounce_window=self.debounce_window,
             batch_size_threshold=self.batch_size_threshold,
-            enable_batching=self.enable_batching
+            enable_batching=self.enable_batching,
         )
 
         # Initialize event handler
         self.event_handler = AsyncSQLFileHandler(
             batch_processor=self.batch_processor,
             organizer=self.organizer,
-            enable_batching=self.enable_batching
+            enable_batching=self.enable_batching,
         )
         self.event_handler.set_event_loop(self.loop)
 
         # Initialize observer
         self.observer = Observer()
-        self.observer.schedule(
-            self.event_handler,
-            str(self.watch_dir),
-            recursive=False
-        )
+        self.observer.schedule(self.event_handler, str(self.watch_dir), recursive=False)
 
         # Process existing files
         if process_existing:
@@ -245,10 +240,7 @@ class AsyncSQLFileWatcher:
 
         # Setup signal handlers
         for sig in (signal.SIGTERM, signal.SIGINT):
-            self.loop.add_signal_handler(
-                sig,
-                lambda: asyncio.create_task(self.stop())
-            )
+            self.loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
 
         # Wait for shutdown
         await self._shutdown_event.wait()
@@ -310,7 +302,7 @@ async def start_async_watcher(
     process_existing: bool = True,
     enable_batching: bool = True,
     debounce_window: float = 5.0,
-    batch_size_threshold: int = 50
+    batch_size_threshold: int = 50,
 ):
     """
     Convenience function to start async SQL file watcher.
@@ -328,7 +320,7 @@ async def start_async_watcher(
         output_dir=output_dir,
         enable_batching=enable_batching,
         debounce_window=debounce_window,
-        batch_size_threshold=batch_size_threshold
+        batch_size_threshold=batch_size_threshold,
     )
 
     await watcher.start(process_existing=process_existing)
@@ -341,7 +333,7 @@ if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     # Check for cache management commands
@@ -373,15 +365,15 @@ if __name__ == "__main__":
         print(f"Hit Rate:            {stats['hit_rate_percent']:.2f}%")
         print(f"Database Size:       {stats['cache_size_mb']:.2f} MB")
 
-        if stats['oldest_entry']:
+        if stats["oldest_entry"]:
             try:
-                oldest = datetime.fromisoformat(stats['oldest_entry'])
+                oldest = datetime.fromisoformat(stats["oldest_entry"])
                 age_days = (datetime.now() - oldest).days
                 print(f"Oldest Entry:        {age_days} days ago")
             except:
                 print(f"Oldest Entry:        {stats['oldest_entry']}")
         else:
-            print(f"Oldest Entry:        N/A")
+            print("Oldest Entry:        N/A")
 
         print(f"TTL:                 {stats['ttl_days']} days")
         print("=" * 70)
@@ -409,9 +401,11 @@ if __name__ == "__main__":
     print()
 
     # Run watcher
-    asyncio.run(start_async_watcher(
-        watch_dir=watch_dir,
-        output_dir=output_dir,
-        enable_batching=enable_batching,
-        debounce_window=debounce
-    ))
+    asyncio.run(
+        start_async_watcher(
+            watch_dir=watch_dir,
+            output_dir=output_dir,
+            enable_batching=enable_batching,
+            debounce_window=debounce,
+        )
+    )

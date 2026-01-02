@@ -26,7 +26,7 @@ class GraphExtractor:
         neo4j_client: Neo4jGraphClient,
         code_parser: CodeParser,
         enable_batching: bool = True,
-        batch_size: int = 100
+        batch_size: int = 100,
     ):
         """
         Initialize GraphExtractor with optional batch processing.
@@ -50,7 +50,7 @@ class GraphExtractor:
         """Creates a deterministic ID from a set of parts."""
         m = hashlib.sha256()
         for part in parts:
-            m.update(str(part).encode('utf-8'))
+            m.update(str(part).encode("utf-8"))
         return m.hexdigest()
 
     def _add_entity_to_batch(self, entity_id: str, entity_type: str, **properties):
@@ -62,11 +62,7 @@ class GraphExtractor:
             entity_type: Entity type/label
             **properties: Additional entity properties
         """
-        entity_data = {
-            "id": entity_id,
-            "entity_type": entity_type,
-            **properties
-        }
+        entity_data = {"id": entity_id, "entity_type": entity_type, **properties}
 
         if self.enable_batching:
             self._entity_batch.append(entity_data)
@@ -75,9 +71,13 @@ class GraphExtractor:
                 self._flush_entities()
         else:
             # Fallback to individual write
-            self.client.add_entity(entity_id=entity_id, entity_type=entity_type, **properties)
+            self.client.add_entity(
+                entity_id=entity_id, entity_type=entity_type, **properties
+            )
 
-    def _add_relationship_to_batch(self, source_id: str, target_id: str, relationship_type: str, **properties):
+    def _add_relationship_to_batch(
+        self, source_id: str, target_id: str, relationship_type: str, **properties
+    ):
         """
         Add relationship to batch or write immediately if batching disabled.
 
@@ -91,7 +91,7 @@ class GraphExtractor:
             "source_id": source_id,
             "target_id": target_id,
             "relationship_type": relationship_type,
-            **properties
+            **properties,
         }
 
         if self.enable_batching:
@@ -101,7 +101,9 @@ class GraphExtractor:
                 self._flush_relationships()
         else:
             # Fallback to individual write
-            self.client.add_relationship(source_id, target_id, relationship_type, **properties)
+            self.client.add_relationship(
+                source_id, target_id, relationship_type, **properties
+            )
 
     def _flush_entities(self):
         """Flush accumulated entities to Neo4j using batch operations."""
@@ -113,8 +115,7 @@ class GraphExtractor:
 
         try:
             created = self.client.batch_create_entities(
-                entities=self._entity_batch,
-                batch_size=self.batch_size
+                entities=self._entity_batch, batch_size=self.batch_size
             )
             logger.info(f"Successfully flushed {created}/{count} entities")
         except Exception as e:
@@ -134,8 +135,7 @@ class GraphExtractor:
 
         try:
             created = self.client.batch_create_relationships(
-                relationships=self._relationship_batch,
-                batch_size=self.batch_size
+                relationships=self._relationship_batch, batch_size=self.batch_size
             )
             logger.info(f"Successfully flushed {created}/{count} relationships")
         except Exception as e:
@@ -157,7 +157,9 @@ class GraphExtractor:
         self._flush_relationships()
         logger.info("Batch flush complete")
 
-    def ingest_sql_lineage(self, sql_content: str, dialect: str = "tsql", source_file: str = "unknown"):
+    def ingest_sql_lineage(
+        self, sql_content: str, dialect: str = "tsql", source_file: str = "unknown"
+    ):
         """
         Parses a SQL script and ingests the resulting lineage into Neo4j.
         This method orchestrates the parsing and graph creation process.
@@ -177,12 +179,16 @@ class GraphExtractor:
         write_asset_id = None
         if parsed_data.get("write") and parsed_data["write"] != "console":
             write_asset_id = self._generate_id("data_asset", parsed_data["write"])
-            asset_type = "View" if parsed_data["write"] in parsed_data.get("views", []) else "Table"
+            asset_type = (
+                "View"
+                if parsed_data["write"] in parsed_data.get("views", [])
+                else "Table"
+            )
             self._add_entity_to_batch(
                 entity_id=write_asset_id,
                 entity_type=asset_type,
                 name=parsed_data["write"],
-                source_file=source_file
+                source_file=source_file,
             )
 
         read_asset_ids = {}
@@ -193,33 +199,35 @@ class GraphExtractor:
                 entity_id=asset_id,
                 entity_type="DataAsset",  # Generic type, could be table or view
                 name=asset_name,
-                source_file=source_file
+                source_file=source_file,
             )
 
         # 2. Ingest Column-Level Lineage
         for col_lineage in parsed_data.get("columns", []):
             target_col_name = col_lineage["target"]
-            
+
             # We need to associate the target column with the write asset
             if not write_asset_id:
                 continue
 
-            target_col_id = self._generate_id("column", parsed_data["write"], target_col_name)
+            target_col_id = self._generate_id(
+                "column", parsed_data["write"], target_col_name
+            )
             self._add_entity_to_batch(
-                entity_id=target_col_id,
-                entity_type="Column",
-                name=target_col_name
+                entity_id=target_col_id, entity_type="Column", name=target_col_name
             )
             # Link column to its parent asset
             self._add_relationship_to_batch(write_asset_id, target_col_id, "CONTAINS")
 
             # Create transformation node
             transformation_logic = col_lineage["transformation"]
-            trans_id = self._generate_id("transformation", transformation_logic, target_col_id)
+            trans_id = self._generate_id(
+                "transformation", transformation_logic, target_col_id
+            )
             self._add_entity_to_batch(
                 entity_id=trans_id,
                 entity_type="Transformation",
-                logic=transformation_logic
+                logic=transformation_logic,
             )
             # Link transformation to the target column it generates
             self._add_relationship_to_batch(trans_id, target_col_id, "GENERATES")
@@ -227,7 +235,7 @@ class GraphExtractor:
             # Link source columns to the transformation
             for source_col_full_name in col_lineage["sources"]:
                 # Simple split, may need more robust parsing for complex names
-                parts = source_col_full_name.split('.')
+                parts = source_col_full_name.split(".")
                 source_table_name = parts[0] if len(parts) > 1 else "unknown"
                 source_col_name = parts[-1]
 
@@ -235,16 +243,22 @@ class GraphExtractor:
                 if not source_asset_id:
                     # If the source asset wasn't in the main "read" list, add it now
                     source_asset_id = self._generate_id("data_asset", source_table_name)
-                    self._add_entity_to_batch(entity_id=source_asset_id, entity_type="DataAsset", name=source_table_name)
+                    self._add_entity_to_batch(
+                        entity_id=source_asset_id,
+                        entity_type="DataAsset",
+                        name=source_table_name,
+                    )
                     read_asset_ids[source_table_name] = source_asset_id
 
-                source_col_id = self._generate_id("column", source_table_name, source_col_name)
-                self._add_entity_to_batch(
-                    entity_id=source_col_id,
-                    entity_type="Column",
-                    name=source_col_name
+                source_col_id = self._generate_id(
+                    "column", source_table_name, source_col_name
                 )
-                self._add_relationship_to_batch(source_asset_id, source_col_id, "CONTAINS")
+                self._add_entity_to_batch(
+                    entity_id=source_col_id, entity_type="Column", name=source_col_name
+                )
+                self._add_relationship_to_batch(
+                    source_asset_id, source_col_id, "CONTAINS"
+                )
                 self._add_relationship_to_batch(source_col_id, trans_id, "INPUT_TO")
 
         # 3. Ingest Functions and Procedures
@@ -254,9 +268,9 @@ class GraphExtractor:
                 entity_id=func_id,
                 entity_type="FunctionOrProcedure",
                 name=func_name,
-                source_file=source_file
+                source_file=source_file,
             )
-        
+
         print(f"Successfully ingested lineage from {source_file}.")
 
     def ingest_file(self, file_path: str):
@@ -280,27 +294,27 @@ class GraphExtractor:
             entity_type="File",
             name=filename,
             path=file_path,
-            extension=ext
+            extension=ext,
         )
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            if ext == '.sql':
+            if ext == ".sql":
                 print(f"[*] Ingesting SQL: {filename}")
                 # Use existing logic, but maybe we can link assets to this file node?
                 # For now, just call the existing method.
                 self.ingest_sql_lineage(content, source_file=filename)
-                
-            elif ext == '.py':
+
+            elif ext == ".py":
                 print(f"[*] Ingesting Python: {filename}")
                 self.ingest_python(content, source_file=filename, file_node_id=file_id)
-                
-            elif ext == '.json':
+
+            elif ext == ".json":
                 print(f"[*] Ingesting JSON: {filename}")
                 self.ingest_json(content, source_file=filename, file_node_id=file_id)
-            
+
             else:
                 print(f"[i] Skipping unsupported file type: {ext}")
 
@@ -320,7 +334,7 @@ class GraphExtractor:
                 entity_id=cls_id,
                 entity_type="Class",
                 name=cls["name"],
-                docstring=cls["docstring"] or ""
+                docstring=cls["docstring"] or "",
             )
             if file_node_id:
                 self._add_relationship_to_batch(file_node_id, cls_id, "DEFINES")
@@ -339,7 +353,7 @@ class GraphExtractor:
                 entity_type="Function",
                 name=func["name"],
                 args=json.dumps(func["args"]),
-                docstring=func["docstring"] or ""
+                docstring=func["docstring"] or "",
             )
             if file_node_id:
                 self._add_relationship_to_batch(file_node_id, func_id, "DEFINES")
@@ -348,11 +362,7 @@ class GraphExtractor:
         for imp in parsed["imports"]:
             # Maybe link to a Module node
             mod_id = self._generate_id("module", imp)
-            self._add_entity_to_batch(
-                entity_id=mod_id,
-                entity_type="Module",
-                name=imp
-            )
+            self._add_entity_to_batch(entity_id=mod_id, entity_type="Module", name=imp)
             if file_node_id:
                 self._add_relationship_to_batch(file_node_id, mod_id, "IMPORTS")
 
@@ -369,7 +379,7 @@ class GraphExtractor:
             name=source_file,
             root_type=parsed["type"],
             key_count=len(parsed["keys"]),
-            array_len=parsed["array_length"]
+            array_len=parsed["array_length"],
         )
         if file_node_id:
             self._add_relationship_to_batch(file_node_id, json_id, "CONTAINS_CONTENT")
@@ -377,28 +387,24 @@ class GraphExtractor:
         # Add keys as nodes if dict
         for key in parsed["keys"]:
             key_id = self._generate_id("json_key", source_file, key)
-            self._add_entity_to_batch(
-                entity_id=key_id,
-                entity_type="JsonKey",
-                name=key
-            )
+            self._add_entity_to_batch(entity_id=key_id, entity_type="JsonKey", name=key)
             self._add_relationship_to_batch(json_id, key_id, "HAS_KEY")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # This is an example of how to use the extractor.
     # It requires a running Neo4j instance and a .env file.
     import os
     from dotenv import load_dotenv
 
-    load_dotenv(dotenv_path='../../.env')
+    load_dotenv(dotenv_path="../../.env")
 
     try:
         neo4j_client = Neo4jGraphClient(
             uri=os.getenv("NEO4J_URI"),
             username=os.getenv("NEO4J_USERNAME"),
             password=os.getenv("NEO4J_PASSWORD"),
-            database=os.getenv("NEO4J_DATABASE")
+            database=os.getenv("NEO4J_DATABASE"),
         )
         code_parser = CodeParser()
         extractor = GraphExtractor(neo4j_client, code_parser)
@@ -417,7 +423,9 @@ if __name__ == '__main__':
         JOIN staging.customers c ON s.customer_id = c.customer_id
         WHERE s.status = 'COMPLETED';
         """
-        extractor.ingest_sql_lineage(sql1, dialect="duckdb", source_file="sales_etl.sql")
+        extractor.ingest_sql_lineage(
+            sql1, dialect="duckdb", source_file="sales_etl.sql"
+        )
 
         print("\n--- Ingesting Example 2: CREATE VIEW ---")
         sql2 = """
@@ -429,7 +437,9 @@ if __name__ == '__main__':
         FROM fact_orders
         GROUP BY 1;
         """
-        extractor.ingest_sql_lineage(sql2, dialect="tsql", source_file="reporting_views.sql")
+        extractor.ingest_sql_lineage(
+            sql2, dialect="tsql", source_file="reporting_views.sql"
+        )
 
         # Flush any remaining batched entities and relationships
         print("\n--- Flushing batch ---")

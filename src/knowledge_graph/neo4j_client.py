@@ -10,15 +10,24 @@ import time
 import logging
 from typing import Optional, Any, List, Dict
 from dataclasses import dataclass
-from neo4j import GraphDatabase, Driver, Session
+from neo4j import GraphDatabase, Driver
 from neo4j.exceptions import ServiceUnavailable, AuthError, TransientError
 
 logger = logging.getLogger(__name__)
+
+# Import DataPathManager for new hierarchical structure
+try:
+    from ..utils.data_paths import DataPathManager
+
+    HAS_DATA_PATH_MANAGER = True
+except ImportError:
+    HAS_DATA_PATH_MANAGER = False
 
 
 @dataclass
 class Neo4jConfig:
     """Neo4j connection configuration."""
+
     uri: str
     username: str
     password: str
@@ -36,13 +45,7 @@ class Neo4jGraphClient:
     - Graph analytics
     """
 
-    def __init__(
-        self,
-        uri: str,
-        username: str,
-        password: str,
-        database: str = "neo4j"
-    ):
+    def __init__(self, uri: str, username: str, password: str, database: str = "neo4j"):
         """
         Initialize the Neo4j client.
 
@@ -58,9 +61,7 @@ class Neo4jGraphClient:
 
         try:
             self.driver: Driver = GraphDatabase.driver(
-                uri,
-                auth=(username, password),
-                max_connection_lifetime=3600
+                uri, auth=(username, password), max_connection_lifetime=3600
             )
             # Verify connectivity
             self.driver.verify_connectivity()
@@ -110,11 +111,7 @@ class Neo4jGraphClient:
     # ==================== Entity Operations ====================
 
     def add_entity(
-        self,
-        entity_id: str,
-        entity_type: str,
-        name: str,
-        **properties
+        self, entity_id: str, entity_type: str, name: str, **properties
     ) -> str:
         """
         Add a node to the graph.
@@ -136,12 +133,7 @@ class Neo4jGraphClient:
         """
 
         self._execute_write(
-            query,
-            {
-                "entity_id": entity_id,
-                "name": name,
-                "properties": properties
-            }
+            query, {"entity_id": entity_id, "name": name, "properties": properties}
         )
 
         return entity_id
@@ -172,48 +164,53 @@ class Neo4jGraphClient:
         return {
             "id": entity_id,
             "entity_type": labels[0] if labels else "Unknown",
-            **node_data
+            **node_data,
         }
 
-    def find_by_name(self, name_pattern: str) -> list[dict]:
+    def find_by_name(self, name_pattern: str, project_id: str = None) -> list[dict]:
         """
         Find nodes by name pattern (case-insensitive contains).
 
         Args:
             name_pattern: Name pattern to search
+            project_id: Filter by project ID (optional)
 
         Returns:
             List of matching entities
         """
-        query = """
+        where_params = ["toLower(n.name) CONTAINS toLower($pattern)"]
+        if project_id:
+            where_params.append("n.project_id = $project_id")
+            
+        where_clause = " AND ".join(where_params)
+
+        query = f"""
         MATCH (n)
-        WHERE toLower(n.name) CONTAINS toLower($pattern)
+        WHERE {where_clause}
         RETURN n, labels(n) as labels
         LIMIT 100
         """
 
-        results = self._execute_query(query, {"pattern": name_pattern})
+        results = self._execute_query(query, {"pattern": name_pattern, "project_id": project_id})
 
         entities = []
         for record in results:
             node_data = record["n"]
             labels = record["labels"]
-            entities.append({
-                "id": node_data.get("id"),
-                "entity_type": labels[0] if labels else "Unknown",
-                **node_data
-            })
+            entities.append(
+                {
+                    "id": node_data.get("id"),
+                    "entity_type": labels[0] if labels else "Unknown",
+                    **node_data,
+                }
+            )
 
         return entities
 
     # ==================== Relationship Operations ====================
 
     def add_relationship(
-        self,
-        source_id: str,
-        target_id: str,
-        relationship_type: str,
-        **properties
+        self, source_id: str, target_id: str, relationship_type: str, **properties
     ):
         """
         Add an edge to the graph.
@@ -234,11 +231,7 @@ class Neo4jGraphClient:
 
         self._execute_write(
             query,
-            {
-                "source_id": source_id,
-                "target_id": target_id,
-                "properties": properties
-            }
+            {"source_id": source_id, "target_id": target_id, "properties": properties},
         )
 
     # ==================== Batch Operations ====================
@@ -247,7 +240,7 @@ class Neo4jGraphClient:
         self,
         entities: List[Dict[str, Any]],
         batch_size: int = 100,
-        max_retries: int = 5
+        max_retries: int = 5,
     ) -> int:
         """
         Create multiple entities in batches using UNWIND pattern.
@@ -280,16 +273,18 @@ class Neo4jGraphClient:
         batches = self._split_into_batches(entities, batch_size)
 
         for batch_num, batch in enumerate(batches, 1):
-            logger.debug(f"Processing entity batch {batch_num}/{len(batches)} ({len(batch)} entities)")
+            logger.debug(
+                f"Processing entity batch {batch_num}/{len(batches)} ({len(batch)} entities)"
+            )
 
             # Extract entity type from first entity (assume homogeneous batches for now)
             # For heterogeneous batches, we'd need a different approach
-            entity_type = batch[0].get('entity_type', 'Node')
+            entity_type = batch[0].get("entity_type", "Node")
 
             # Prepare batch data (exclude entity_type from properties)
             batch_data = []
             for entity in batch:
-                props = {k: v for k, v in entity.items() if k not in ['entity_type']}
+                props = {k: v for k, v in entity.items() if k not in ["entity_type"]}
                 batch_data.append(props)
 
             query = f"""
@@ -304,32 +299,32 @@ class Neo4jGraphClient:
                     query,
                     {"entities": batch_data},
                     max_retries=max_retries,
-                    batch_size=len(batch)
+                    batch_size=len(batch),
                 )
                 created = result[0]["created"] if result else len(batch)
                 total_created += created
                 logger.debug(f"Created {created} entities in batch {batch_num}")
 
             except Exception as e:
-                logger.error(f"Failed to create entity batch {batch_num} after retries: {e}")
+                logger.error(
+                    f"Failed to create entity batch {batch_num} after retries: {e}"
+                )
                 # Try partial failure recovery
                 partial_created = self._handle_partial_failure(
-                    query,
-                    batch_data,
-                    batch_size,
-                    max_retries,
-                    "entities"
+                    query, batch_data, batch_size, max_retries, "entities"
                 )
                 total_created += partial_created
 
-        logger.info(f"Batch entity creation complete: {total_created}/{len(entities)} entities created")
+        logger.info(
+            f"Batch entity creation complete: {total_created}/{len(entities)} entities created"
+        )
         return total_created
 
     def batch_create_relationships(
         self,
         relationships: List[Dict[str, Any]],
         batch_size: int = 100,
-        max_retries: int = 5
+        max_retries: int = 5,
     ) -> int:
         """
         Create multiple relationships in batches using UNWIND pattern.
@@ -362,15 +357,17 @@ class Neo4jGraphClient:
         batches = self._split_into_batches(relationships, batch_size)
 
         for batch_num, batch in enumerate(batches, 1):
-            logger.debug(f"Processing relationship batch {batch_num}/{len(batches)} ({len(batch)} relationships)")
+            logger.debug(
+                f"Processing relationship batch {batch_num}/{len(batches)} ({len(batch)} relationships)"
+            )
 
             # Extract relationship type from first relationship
-            rel_type = batch[0].get('relationship_type', 'RELATED_TO')
+            rel_type = batch[0].get("relationship_type", "RELATED_TO")
 
             # Prepare batch data
             batch_data = []
             for rel in batch:
-                props = {k: v for k, v in rel.items() if k not in ['relationship_type']}
+                props = {k: v for k, v in rel.items() if k not in ["relationship_type"]}
                 batch_data.append(props)
 
             query = f"""
@@ -387,32 +384,32 @@ class Neo4jGraphClient:
                     query,
                     {"relationships": batch_data},
                     max_retries=max_retries,
-                    batch_size=len(batch)
+                    batch_size=len(batch),
                 )
                 created = result[0]["created"] if result else len(batch)
                 total_created += created
                 logger.debug(f"Created {created} relationships in batch {batch_num}")
 
             except Exception as e:
-                logger.error(f"Failed to create relationship batch {batch_num} after retries: {e}")
+                logger.error(
+                    f"Failed to create relationship batch {batch_num} after retries: {e}"
+                )
                 # Try partial failure recovery
                 partial_created = self._handle_partial_failure(
-                    query,
-                    batch_data,
-                    batch_size,
-                    max_retries,
-                    "relationships"
+                    query, batch_data, batch_size, max_retries, "relationships"
                 )
                 total_created += partial_created
 
-        logger.info(f"Batch relationship creation complete: {total_created}/{len(relationships)} relationships created")
+        logger.info(
+            f"Batch relationship creation complete: {total_created}/{len(relationships)} relationships created"
+        )
         return total_created
 
     def _split_into_batches(self, items: List[Any], batch_size: int) -> List[List[Any]]:
         """Split list into batches of specified size."""
         batches = []
         for i in range(0, len(items), batch_size):
-            batches.append(items[i:i + batch_size])
+            batches.append(items[i : i + batch_size])
         return batches
 
     def _execute_write_with_retry(
@@ -420,7 +417,7 @@ class Neo4jGraphClient:
         query: str,
         parameters: Dict[str, Any],
         max_retries: int = 5,
-        batch_size: int = None
+        batch_size: int = None,
     ) -> list:
         """
         Execute write transaction with exponential backoff retry on transient errors.
@@ -470,7 +467,7 @@ class Neo4jGraphClient:
         batch_data: List[Dict],
         original_batch_size: int,
         max_retries: int,
-        param_name: str
+        param_name: str,
     ) -> int:
         """
         Handle partial batch failure by splitting into smaller batches.
@@ -491,7 +488,7 @@ class Neo4jGraphClient:
         reduced_sizes = [
             original_batch_size // 2,  # 50
             original_batch_size // 10,  # 10
-            1  # Individual items
+            1,  # Individual items
         ]
 
         for reduced_size in reduced_sizes:
@@ -510,9 +507,13 @@ class Neo4jGraphClient:
                             query,
                             {param_name: sub_batch},
                             max_retries=max_retries,
-                            batch_size=len(sub_batch)
+                            batch_size=len(sub_batch),
                         )
-                        processed = result[0].get("created", len(sub_batch)) if result else len(sub_batch)
+                        processed = (
+                            result[0].get("created", len(sub_batch))
+                            if result
+                            else len(sub_batch)
+                        )
                         total_processed += processed
 
                     except Exception as e:
@@ -521,43 +522,58 @@ class Neo4jGraphClient:
                         self._log_failed_items(sub_batch, str(e))
 
                 if total_processed > 0:
-                    logger.info(f"Partial recovery successful: {total_processed}/{len(batch_data)} items processed")
+                    logger.info(
+                        f"Partial recovery successful: {total_processed}/{len(batch_data)} items processed"
+                    )
                     return total_processed
 
             except Exception as e:
-                logger.error(f"Partial failure recovery failed at batch size {reduced_size}: {e}")
+                logger.error(
+                    f"Partial failure recovery failed at batch size {reduced_size}: {e}"
+                )
                 continue
 
         # All recovery attempts failed
-        logger.error(f"All partial recovery attempts failed. Logging {len(batch_data)} failed items.")
+        logger.error(
+            f"All partial recovery attempts failed. Logging {len(batch_data)} failed items."
+        )
         self._log_failed_items(batch_data, "All retry attempts exhausted")
         return 0
 
-    def _log_failed_items(self, items: List[Dict], error_message: str):
+    def _log_failed_items(
+        self, items: List[Dict], error_message: str, database_name: str = "default"
+    ):
         """
-        Log failed items to data/failed_ingestion.jsonl.
+        Log failed items to failed_ingestion.jsonl.
 
         Args:
             items: Failed items
             error_message: Error description
+            database_name: Database name for new hierarchical structure
         """
         import json
         from datetime import datetime
         from pathlib import Path
 
-        log_file = Path("data/failed_ingestion.jsonl")
-        log_file.parent.mkdir(parents=True, exist_ok=True)
+        # Use new hierarchical structure if available
+        if HAS_DATA_PATH_MANAGER:
+            paths = DataPathManager(data_root="./data", database_name=database_name)
+            log_file = paths.metadata_path("failed_ingestion.jsonl")
+        else:
+            # Fallback to old structure
+            log_file = Path("data/failed_ingestion.jsonl")
+            log_file.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            with open(log_file, 'a') as f:
+            with open(log_file, "a") as f:
                 for item in items:
                     log_entry = {
                         "timestamp": datetime.now().isoformat(),
                         "error": error_message,
-                        "database": "neo4j",
-                        "item": item
+                        "database": database_name,
+                        "item": item,
                     }
-                    f.write(json.dumps(log_entry) + '\n')
+                    f.write(json.dumps(log_entry) + "\n")
 
             logger.info(f"Logged {len(items)} failed items to {log_file}")
 
@@ -566,19 +582,35 @@ class Neo4jGraphClient:
 
     # ==================== Lineage Queries ====================
 
-    def get_upstream(self, entity_id: str, max_depth: int = 10) -> list[dict]:
+    def get_upstream(
+        self,
+        entity_id: str,
+        max_depth: int = 10,
+        project_id: str = None,
+        repo_ids: List[str] = None,
+    ) -> list[dict]:
         """
         Get all upstream (incoming) relationships.
 
         Args:
             entity_id: Starting entity ID
             max_depth: Maximum traversal depth
+            project_id: Filter by project ID (optional)
+            repo_ids: Filter by repository IDs (optional)
 
         Returns:
             List of upstream relationships
         """
+        # Build where clause for filtering
+        where_clauses = ["(source.project_id = $project_id OR $project_id IS NULL)"]
+        if repo_ids:
+            where_clauses.append("(source.repository_id IN $repo_ids)")
+        
+        where_stmt = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+
         query = """
         MATCH path = (source)-[r*1..{max_depth}]->(target {{id: $entity_id}})
+        {where_stmt}
         WITH source, target, relationships(path) as rels, nodes(path) as nodes
         UNWIND range(0, size(rels)-1) as idx
         WITH nodes[idx] as src, rels[idx] as rel, nodes[idx+1] as tgt, idx
@@ -589,23 +621,49 @@ class Neo4jGraphClient:
             properties(src) as source_data,
             idx as depth
         LIMIT 100
-        """.format(max_depth=max_depth)
+        """.format(
+            max_depth=max_depth,
+            where_stmt=where_stmt
+        )
 
-        return self._execute_query(query, {"entity_id": entity_id})
+        return self._execute_query(
+            query,
+            {
+                "entity_id": entity_id,
+                "project_id": project_id,
+                "repo_ids": repo_ids
+            }
+        )
 
-    def get_downstream(self, entity_id: str, max_depth: int = 10) -> list[dict]:
+    def get_downstream(
+        self,
+        entity_id: str,
+        max_depth: int = 10,
+        project_id: str = None,
+        repo_ids: List[str] = None,
+    ) -> list[dict]:
         """
         Get all downstream (outgoing) relationships.
 
         Args:
             entity_id: Starting entity ID
             max_depth: Maximum traversal depth
+            project_id: Filter by project ID (optional)
+            repo_ids: Filter by repository IDs (optional)
 
         Returns:
             List of downstream relationships
         """
+        # Build where clause for filtering targets
+        where_clauses = ["(target.project_id = $project_id OR $project_id IS NULL)"]
+        if repo_ids:
+            where_clauses.append("(target.repository_id IN $repo_ids)")
+        
+        where_stmt = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+
         query = """
         MATCH path = (source {{id: $entity_id}})-[r*1..{max_depth}]->(target)
+        {where_stmt}
         WITH source, target, relationships(path) as rels, nodes(path) as nodes
         UNWIND range(0, size(rels)-1) as idx
         WITH nodes[idx] as src, rels[idx] as rel, nodes[idx+1] as tgt, idx
@@ -616,9 +674,19 @@ class Neo4jGraphClient:
             properties(tgt) as target_data,
             idx as depth
         LIMIT 100
-        """.format(max_depth=max_depth)
+        """.format(
+            max_depth=max_depth,
+            where_stmt=where_stmt
+        )
 
-        return self._execute_query(query, {"entity_id": entity_id})
+        return self._execute_query(
+            query, 
+            {
+                "entity_id": entity_id,
+                "project_id": project_id,
+                "repo_ids": repo_ids
+            }
+        )
 
     def get_path(self, source_id: str, target_id: str) -> list[str]:
         """
@@ -639,8 +707,7 @@ class Neo4jGraphClient:
         """
 
         results = self._execute_query(
-            query,
-            {"source_id": source_id, "target_id": target_id}
+            query, {"source_id": source_id, "target_id": target_id}
         )
 
         return results[0]["path"] if results else []
@@ -683,7 +750,7 @@ class Neo4jGraphClient:
             "nodes": node_count,
             "edges": edge_count,
             "node_types": node_types,
-            "relationship_types": relationship_types
+            "relationship_types": relationship_types,
         }
 
     def clear_graph(self):
@@ -717,6 +784,7 @@ class Neo4jGraphClient:
 
 # ==================== Helper Functions ====================
 
+
 def create_neo4j_client_from_env() -> Neo4jGraphClient:
     """
     Create Neo4j client from environment variables.
@@ -742,8 +810,5 @@ def create_neo4j_client_from_env() -> Neo4jGraphClient:
         )
 
     return Neo4jGraphClient(
-        uri=uri,
-        username=username,
-        password=password,
-        database=database
+        uri=uri, username=username, password=password, database=database
     )
