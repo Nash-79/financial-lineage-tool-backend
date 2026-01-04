@@ -207,6 +207,66 @@ class Neo4jGraphClient:
 
         return entities
 
+    def find_by_names(self, names: List[str], project_id: str = None, limit: int = 50) -> list[dict]:
+        """
+        Find nodes by multiple name patterns in a single query (batch operation).
+
+        This is more efficient than calling find_by_name() multiple times as it
+        executes a single Cypher query with an IN clause.
+
+        Args:
+            names: List of name patterns to search (case-insensitive contains)
+            project_id: Filter by project ID (optional)
+            limit: Maximum results to return (default: 50)
+
+        Returns:
+            List of matching entities (deduplicated)
+        """
+        if not names:
+            return []
+
+        # Filter out short words and normalize
+        filtered_names = [n.strip().lower() for n in names if len(n.strip()) > 2]
+        if not filtered_names:
+            return []
+
+        # Build WHERE clause
+        where_params = ["ANY(pattern IN $patterns WHERE toLower(n.name) CONTAINS pattern)"]
+        if project_id:
+            where_params.append("n.project_id = $project_id")
+
+        where_clause = " AND ".join(where_params)
+
+        query = f"""
+        MATCH (n)
+        WHERE {where_clause}
+        RETURN DISTINCT n, labels(n) as labels
+        LIMIT $limit
+        """
+
+        results = self._execute_query(
+            query,
+            {"patterns": filtered_names, "project_id": project_id, "limit": limit}
+        )
+
+        entities = []
+        seen_ids = set()
+        for record in results:
+            node_data = record["n"]
+            node_id = node_data.get("id")
+            if node_id and node_id not in seen_ids:
+                seen_ids.add(node_id)
+                labels = record["labels"]
+                entities.append(
+                    {
+                        "id": node_id,
+                        "entity_type": labels[0] if labels else "Unknown",
+                        **node_data,
+                    }
+                )
+
+        return entities
+
     # ==================== Relationship Operations ====================
 
     def add_relationship(

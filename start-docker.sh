@@ -58,7 +58,7 @@ echo "[*] Starting services with Docker Compose..."
 echo ""
 
 # Start Docker Compose
-docker compose -f docker-compose.yml up -d --build
+docker compose -f docker-compose.yml up -d
 
 echo ""
 echo "================================================================"

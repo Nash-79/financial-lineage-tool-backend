@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.ingestion.code_parser import CodeParser
 from src.knowledge_graph.entity_extractor import GraphExtractor
 from src.knowledge_graph.neo4j_client import Neo4jGraphClient
-from src.services import LocalSupervisorAgent, OllamaClient, QdrantLocalClient, set_tracker_broadcast
+from src.services import LocalSupervisorAgent, OllamaClient, QdrantLocalClient, MemoryService, set_tracker_broadcast
 from src.storage.duckdb_client import initialize_duckdb, close_duckdb
 from src.storage.metadata_store import ensure_default_project
 
@@ -43,6 +43,7 @@ class AppState:
     parser: Optional[CodeParser] = None
     extractor: Optional[GraphExtractor] = None
     llamaindex_service: Optional[Any] = None  # LlamaIndexService when enabled
+    memory: Optional[MemoryService] = None  # Long-term chat memory
     redis_client: Optional[Any] = None  # Redis client for caching
     activity_tracker: Optional[Any] = None  # Activity tracking for metrics
 
@@ -103,11 +104,7 @@ async def lifespan(app: FastAPI):
         print(f"[!] WARNING: Failed to initialize DuckDB: {e}")
         print("[!] Metadata storage will not be available")
 
-    # Initialize clients
-    state.ollama = OllamaClient(host=config.OLLAMA_HOST)
-    state.qdrant = QdrantLocalClient(host=config.QDRANT_HOST, port=config.QDRANT_PORT)
-
-    # Initialize Redis client for caching
+    # Initialize Redis client for caching (before Ollama so we can pass it)
     print(f"[*] Connecting to Redis at {config.REDIS_HOST}:{config.REDIS_PORT}...")
     try:
         import redis.asyncio as redis
@@ -126,6 +123,10 @@ async def lifespan(app: FastAPI):
         print(f"[!] WARNING: Failed to connect to Redis: {e}")
         print("[!] Caching will be disabled")
         state.redis_client = None
+
+    # Initialize clients (pass Redis to Ollama for embedding cache)
+    state.ollama = OllamaClient(host=config.OLLAMA_HOST, redis_client=state.redis_client)
+    state.qdrant = QdrantLocalClient(host=config.QDRANT_HOST, port=config.QDRANT_PORT)
 
     # Initialize activity tracker
     print("[*] Initializing activity tracker...")
@@ -165,6 +166,16 @@ async def lifespan(app: FastAPI):
         print("    2. If in Docker, ensure host.docker.internal is accessible")
         print("    3. Check firewall settings")
         print("[!] Continuing anyway, but LLM features will not work...")
+
+    # Initialize Memory Service
+    print("[*] Initializing Memory Service...")
+    state.memory = MemoryService(
+        ollama=state.ollama,
+        qdrant=state.qdrant,
+        embedding_model=config.EMBEDDING_MODEL
+    )
+    await state.memory.initialize()
+    print("[+] Memory Service initialized")
 
     # Initialize LlamaIndex if enabled
     if config.USE_LLAMAINDEX:

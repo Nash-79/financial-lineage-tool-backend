@@ -411,6 +411,27 @@ GET /api/v1/metrics/events?limit=100
 
 ## Chat Endpoints
 
+### ChatRequest Model
+
+All chat endpoints accept the following request format:
+
+```json
+{
+  "query": "string (required)",
+  "history": [{"role": "user/assistant", "content": "..."}],
+  "context": {"key": "value"},
+  "session_id": "optional-session-id",
+  "skip_memory": false
+}
+```
+
+**Parameters**:
+- `query` (string, required): The user's question or prompt
+- `history` (array, optional): Conversation history (not currently used)
+- `context` (object, optional): Additional context for filtering
+- `session_id` (string, optional): Session ID for memory context retrieval
+- `skip_memory` (boolean, optional): Skip memory context retrieval for faster response (saves ~300ms). Default: false
+
 ### Deep Analysis Chat
 
 Comprehensive analysis with maximum context (top 10 results).
@@ -426,7 +447,9 @@ POST /api/chat/deep
   "context": {
     "database": "production",
     "schema": "analytics"
-  }
+  },
+  "session_id": "sess-123",
+  "skip_memory": false
 }
 ```
 
@@ -442,8 +465,56 @@ POST /api/chat/deep
     }
   ],
   "query_type": "deep",
-  "latency_ms": 456.7
+  "latency_ms": 456.7,
+  "graph_data": {
+    "nodes": [{"id": "t1", "data": {"label": "customers", "type": "Table"}}],
+    "edges": [{"id": "e1", "source": "t1", "target": "t2", "label": "DEPENDS_ON"}]
+  }
 }
+```
+
+### Deep Analysis Chat (Streaming)
+
+Streaming version using Server-Sent Events for real-time response.
+
+```http
+POST /api/chat/deep/stream
+```
+
+**Request**: `ChatRequest` (same as `/deep`)
+
+**Response**: `text/event-stream`
+
+Event types:
+- `chunk`: Partial response text
+- `done`: Final event with sources and metadata
+- `error`: Error event
+
+```
+data: {"type": "chunk", "content": "The customer"}
+
+data: {"type": "chunk", "content": " analysis pipeline"}
+
+data: {"type": "done", "sources": [...], "graph_data": {...}, "latency_ms": 456.7}
+```
+
+**Frontend Usage (JavaScript)**:
+```javascript
+const eventSource = new EventSource('/api/chat/deep/stream', {
+  method: 'POST',
+  body: JSON.stringify({ query: "...", session_id: "..." })
+});
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === 'chunk') {
+    // Append to response
+    responseText += data.content;
+  } else if (data.type === 'done') {
+    // Handle completion
+    eventSource.close();
+  }
+};
 ```
 
 ### Semantic Search Chat
@@ -534,6 +605,59 @@ POST /api/chat/text
   "sources": [],
   "query_type": "text",
   "latency_ms": 89.2
+}
+```
+
+### Generate Session Title
+
+Generate a short descriptive title for a chat session.
+
+```http
+POST /api/chat/title
+```
+
+**Request**: `ChatRequest`
+```json
+{
+  "query": "What is the lineage of the customers table?"
+}
+```
+
+**Response**:
+```json
+{
+  "title": "Customer Table Lineage"
+}
+```
+
+**Notes**:
+- Generates a 15-30 character title
+- Falls back to truncated query if generation fails
+
+### Delete Session Memory
+
+Delete chat memory for a specific session.
+
+```http
+DELETE /api/chat/session/{session_id}
+```
+
+**Path Parameters**:
+- `session_id` (string, required): Session identifier
+
+**Response** (202 Accepted):
+```json
+{
+  "status": "accepted",
+  "message": "Memory deletion scheduled for sess-123"
+}
+```
+
+**Response** (Memory not initialized):
+```json
+{
+  "status": "ignored",
+  "message": "Memory service not initialized"
 }
 ```
 

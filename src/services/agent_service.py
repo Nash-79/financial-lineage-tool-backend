@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import asyncio
+import time
+from typing import TYPE_CHECKING, List, Tuple
 
 if TYPE_CHECKING:
     from src.knowledge_graph.neo4j_client import Neo4jGraphClient
@@ -63,52 +65,123 @@ If you don't have enough information, say so clearly."""
         self.llm_model = llm_model
         self.embedding_model = embedding_model
 
-    async def query(self, question: str) -> dict:
+    async def _parallel_search(self, question: str) -> Tuple[List[dict], List[dict]]:
+        """Execute vector search and graph search in parallel.
+
+        Args:
+            question: The user's question.
+
+        Returns:
+            Tuple of (code_results, graph_results).
+        """
+
+        async def do_vector_search() -> List[dict]:
+            """Embed question and search vector DB."""
+            try:
+                query_embedding = await self.ollama.embed(question, self.embedding_model)
+                results = await self.qdrant.search(
+                    collection="code_chunks", vector=query_embedding, limit=5
+                )
+                return results
+            except Exception as e:
+                print(f"[!] Vector search failed: {e}")
+                return []
+
+        async def do_graph_search() -> List[dict]:
+            """Search graph for entities using batch query."""
+            try:
+                # Extract potential entity names from question
+                words = question.replace("_", " ").split()
+                search_terms = [w for w in words if len(w) > 3]
+
+                # Also try singular forms for plural words
+                for word in list(search_terms):
+                    if word.endswith('s') and len(word) > 4:
+                        search_terms.append(word[:-1])
+
+                # Use batch query instead of loop
+                if search_terms:
+                    # Run in executor since Neo4j driver is sync
+                    loop = asyncio.get_event_loop()
+                    results = await loop.run_in_executor(
+                        None,
+                        lambda: self.graph.find_by_names(search_terms, limit=10)
+                    )
+                    return results
+                return []
+            except Exception as e:
+                print(f"[!] Graph search failed: {e}")
+                return []
+
+        # Execute both searches in parallel
+        results = await asyncio.gather(
+            do_vector_search(),
+            do_graph_search(),
+            return_exceptions=True
+        )
+
+        # Handle any exceptions from gather
+        code_results = results[0] if not isinstance(results[0], Exception) else []
+        graph_results = results[1] if not isinstance(results[1], Exception) else []
+
+        if isinstance(results[0], Exception):
+            print(f"[!] Vector search exception: {results[0]}")
+        if isinstance(results[1], Exception):
+            print(f"[!] Graph search exception: {results[1]}")
+
+        return code_results, graph_results
+
+    def _get_lineage_info(self, graph_results: List[dict]) -> List[dict]:
+        """Get upstream/downstream lineage for found entities.
+
+        Args:
+            graph_results: List of entities found in graph search.
+
+        Returns:
+            List of lineage info dictionaries.
+        """
+        lineage_info = []
+        for entity in graph_results[:2]:  # Limit to first 2 entities
+            entity_id = entity.get("id")
+            if entity_id:
+                try:
+                    upstream = self.graph.get_upstream(entity_id, max_depth=5)
+                    downstream = self.graph.get_downstream(entity_id, max_depth=5)
+                    lineage_info.append(
+                        {
+                            "entity": entity,
+                            "upstream": upstream[:5],
+                            "downstream": downstream[:5],
+                        }
+                    )
+                except Exception as e:
+                    print(f"[!] Failed to get lineage for {entity_id}: {e}")
+        return lineage_info
+
+    async def query(self, question: str, memory_context: str = "") -> dict:
         """Process a lineage query.
 
         Combines vector search and graph traversal to answer natural
-        language questions about data lineage.
+        language questions about data lineage. Uses parallel execution
+        for independent operations to minimize latency.
 
         Args:
             question: Natural language question about data lineage.
+            memory_context: Optional context from chat memory.
 
         Returns:
             Dictionary with answer, sources, graph entities, and confidence.
         """
+        start_time = time.time()
 
-        # Step 1: Search for relevant code in vector DB
-        try:
-            query_embedding = await self.ollama.embed(question, self.embedding_model)
-            code_results = await self.qdrant.search(
-                collection="code_chunks", vector=query_embedding, limit=5
-            )
-        except Exception as e:
-            code_results = []
-            print(f"Vector search failed: {e}")
+        # Step 1: Execute vector search and graph search in PARALLEL
+        code_results, graph_results = await self._parallel_search(question)
 
-        # Step 2: Search graph for entities mentioned in question
-        graph_results = []
-        # Extract potential entity names (simple approach)
-        words = question.replace("_", " ").split()
-        for word in words:
-            if len(word) > 3:  # Skip short words
-                matches = self.graph.find_by_name(word)
-                graph_results.extend(matches[:3])
+        search_time = time.time() - start_time
+        print(f"[*] Parallel search completed in {search_time*1000:.1f}ms")
 
-        # Get lineage for found entities
-        lineage_info = []
-        for entity in graph_results[:2]:
-            entity_id = entity.get("id")
-            if entity_id:
-                upstream = self.graph.get_upstream(entity_id, max_depth=5)
-                downstream = self.graph.get_downstream(entity_id, max_depth=5)
-                lineage_info.append(
-                    {
-                        "entity": entity,
-                        "upstream": upstream[:5],
-                        "downstream": downstream[:5],
-                    }
-                )
+        # Step 2: Get lineage for found entities (sequential - depends on graph_results)
+        lineage_info = self._get_lineage_info(graph_results)
 
         # Step 3: Build context for LLM
         context = ""
@@ -133,10 +206,25 @@ If you don't have enough information, say so clearly."""
                     context += f"Downstream targets: {len(info['downstream'])} found\n"
                 context += "\n"
 
+        # Construct visual graph data BEFORE LLM call (so it's always returned)
+        # Initialize with empty structure to ensure it's never None
+        graph_data = {"nodes": [], "edges": []}
+        try:
+            if lineage_info:
+                graph_data = self._build_graph_data(lineage_info)
+                print(f"[*] Built graph data: {len(graph_data.get('nodes', []))} nodes, {len(graph_data.get('edges', []))} edges")
+        except Exception as e:
+            print(f"[!] Failed to build graph data: {e}")
+            # Keep empty graph_data structure
+
         if not context:
             context = (
                 "No relevant code or graph data found. Please ingest some data first."
             )
+
+        # Prepend memory context if available
+        if memory_context:
+            context = f"{memory_context}\n\n{context}"
 
         # Step 4: Generate response with Ollama
         prompt = f"""Question: {question}
@@ -147,14 +235,26 @@ Based on the information above, answer the question about data lineage.
 If there's no relevant data, explain what information would be needed."""
 
         try:
+            print(f"[*] Prompt Context Length: {len(context)}")
+            # print(f"[*] Full Prompt: {prompt[:500]}...") # Debug only
+            print(f"[*] Sending prompt to {self.llm_model} (Length: {len(prompt)})")
             response = await self.ollama.generate(
                 prompt=prompt,
                 model=self.llm_model,
                 system=self.SYSTEM_PROMPT,
                 temperature=0.1,
             )
+            print(f"[*] Received response from LLM (Length: {len(response)})")
+            
+            if not response or not response.strip():
+                response = "The LLM returned an empty response. This might be due to memory constraints or model issues. Please check the backend logs."
+                
         except Exception as e:
-            response = f"Error generating response: {e}"
+            print(f"[!] LLM generation failed: {e}")
+            if "500" in str(e):
+                 response = "Error: The model failed to generate a response (500). This is often due to insufficient memory (OOM) or context window limits. Try restarting Ollama or using a smaller context."
+            else:
+                response = f"Error generating response: {e}"
 
         return {
             "question": question,
@@ -165,5 +265,73 @@ If there's no relevant data, explain what information would be needed."""
                 if r.get("payload")
             ],
             "graph_entities": [e.get("name") for e in graph_results],
+            "graph_data": graph_data,
             "confidence": 0.8 if (code_results or graph_results) else 0.3,
         }
+
+    def _build_graph_data(self, lineage_info: list) -> dict:
+        """Construct nodes and edges for visual graph."""
+        nodes = {}
+        edges = []
+        
+        for info in lineage_info:
+            # Main Entity (Center)
+            entity = info["entity"]
+            eid = entity.get("id")
+            if eid and eid not in nodes:
+                nodes[eid] = {
+                    "id": eid,
+                    "data": {"label": entity.get("name", "Unknown"), "type": entity.get("entity_type", "Node")},
+                    "position": {"x": 0, "y": 0}  # Layout will be handled by frontend
+                }
+            
+            # Upstream
+            for rel in info.get("upstream", []):
+                # source -> entity
+                sid = rel.get("source")
+                if sid and sid not in nodes:
+                    source_data = rel.get("source_data", {})
+                    nodes[sid] = {
+                        "id": sid,
+                        "data": {"label": source_data.get("name", sid), "type": source_data.get("entity_type", "Source")},
+                        "position": {"x": 0, "y": 0}
+                    }
+                
+                if sid and eid:
+                    edge_id = f"{sid}-{eid}"
+                    edges.append({
+                        "id": edge_id,
+                        "source": sid,
+                        "target": eid,
+                        "label": rel.get("relationship", "RELATED")
+                    })
+
+            # Downstream
+            for rel in info.get("downstream", []):
+                # entity -> target
+                tid = rel.get("target")
+                if tid and tid not in nodes:
+                    target_data = rel.get("target_data", {})
+                    nodes[tid] = {
+                        "id": tid,
+                        "data": {"label": target_data.get("name", tid), "type": target_data.get("entity_type", "Target")},
+                        "position": {"x": 0, "y": 0}
+                    }
+                
+                if eid and tid:
+                    edge_id = f"{eid}-{tid}"
+                    edges.append({
+                        "id": edge_id,
+                        "source": eid,
+                        "target": tid,
+                        "label": rel.get("relationship", "RELATED")
+                    })
+                
+        # Deduplicate edges based on ID
+        unique_edges = {e["id"]: e for e in edges}.values()
+        
+        return {
+            "nodes": list(nodes.values()),
+            "edges": list(unique_edges)
+        }
+

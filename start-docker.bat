@@ -61,7 +61,7 @@ echo [*] Starting services with Docker Compose...
 echo.
 
 REM Start Docker Compose
-docker compose up -d --build
+docker compose up -d
 
 if %ERRORLEVEL% NEQ 0 (
     echo.

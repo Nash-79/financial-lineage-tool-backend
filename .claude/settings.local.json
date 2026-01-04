@@ -21,7 +21,8 @@
       "Bash(docker logs:*)",
       "Bash(cat:*)",
       "Bash(docker-compose logs:*)",
-      "Bash(docker-compose exec api sh -c 'python3 -c \"\"import duckdb; conn = duckdb.connect\\(\\\\\"\"/app/data/test_write.db\\\\\"\"\\); conn.execute\\(\\\\\"\"CREATE TABLE test \\(id INTEGER\\)\\\\\"\"\\); print\\(\\\\\"\"SUCCESS\\\\\"\"\\)\"\"')"
+      "Bash(docker-compose exec api sh -c 'python3 -c \"\"import duckdb; conn = duckdb.connect\\(\\\\\"\"/app/data/test_write.db\\\\\"\"\\); conn.execute\\(\\\\\"\"CREATE TABLE test \\(id INTEGER\\)\\\\\"\"\\); print\\(\\\\\"\"SUCCESS\\\\\"\"\\)\"\"')",
+      "Bash(mkdir:*)"
     ]
   }
 }

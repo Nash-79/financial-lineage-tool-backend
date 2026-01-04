@@ -21,6 +21,8 @@ class LocalConfig:
     OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     LLM_MODEL = os.getenv("LLM_MODEL", "llama3.1:8b")
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+    # Limit context window to prevent OOM on 16GB RAM machines (Default: 4096)
+    OLLAMA_CONTEXT_WINDOW = int(os.getenv("OLLAMA_CONTEXT_WINDOW", "4096"))
 
     # LlamaIndex settings
     USE_LLAMAINDEX = os.getenv("USE_LLAMAINDEX", "false").lower() == "true"
