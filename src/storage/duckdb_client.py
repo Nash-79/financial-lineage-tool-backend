@@ -57,8 +57,21 @@ class DuckDBClient:
         else:
             logger.info("Initializing in-memory DuckDB")
 
-        # Connect to database
-        self.conn = duckdb.connect(self.db_path)
+        # Connect to database with retry mechanism
+        import time
+        max_retries = 5
+        retry_delay = 1.0
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.conn = duckdb.connect(self.db_path)
+                break
+            except (duckdb.Error, OSError) as e:
+                if attempt == max_retries:
+                    logger.error(f"Failed to connect to DuckDB after {max_retries} attempts: {e}")
+                    raise
+                logger.warning(f"DuckDB connection attempt {attempt} failed ({e}). Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
 
         # Create schema
         self._create_schema()
