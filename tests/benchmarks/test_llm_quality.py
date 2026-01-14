@@ -48,7 +48,7 @@ class LLMBenchmark:
             search_function: Function that takes (query: str, limit: int) and returns
                             list of context chunks
             model_name: Name of LLM model being tested
-            provider: Provider (ollama, groq, openrouter)
+            provider: Provider (ollama, openrouter)
 
         Returns:
             Dictionary with all metrics

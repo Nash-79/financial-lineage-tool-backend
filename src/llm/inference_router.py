@@ -1,7 +1,7 @@
 """Inference router with hybrid local-first strategy and automatic fallback.
 
 Routes LLM requests to local Ollama by default, with automatic fallback to
-cloud providers (Groq, OpenRouter) when Ollama is unavailable or OOM.
+OpenRouter when Ollama is unavailable or OOM.
 """
 
 from __future__ import annotations
@@ -12,13 +12,9 @@ import tiktoken
 from typing import Awaitable, Optional, Callable
 
 from src.api.config import config
-from src.llm.circuit_breaker import (
-    CircuitBreaker,
-    CircuitBreakerOpenError,
-    RateLimitError,
-)
+from src.llm.circuit_breaker import CircuitBreaker
 from src.llm.free_tier import DEFAULT_FREE_TIER_MODEL, enforce_free_tier
-from src.llm.remote_clients import GroqClient, OpenRouterClient
+from src.llm.remote_clients import OpenRouterClient
 from src.services.ollama_service import OllamaClient
 
 logger = logging.getLogger(__name__)
@@ -63,26 +59,19 @@ class InferenceRouter:
         self.mode = mode
         self.ollama = ollama_service or OllamaClient(host=config.OLLAMA_HOST)
 
-        # Initialize remote clients if API keys are available
-        self.groq: GroqClient | None = None
+        # Initialize remote client if API key is available
         self.openrouter: OpenRouterClient | None = None
-
-        if config.GROQ_API_KEY:
-            self.groq = GroqClient(api_key=config.GROQ_API_KEY)
-            logger.info("Groq client initialized")
 
         if config.OPENROUTER_API_KEY:
             self.openrouter = OpenRouterClient(api_key=config.OPENROUTER_API_KEY)
             logger.info("OpenRouter client initialized")
 
-        # Circuit breakers for rate limiting
-        self.groq_breaker = CircuitBreaker(cooldown_seconds=60, name="groq")
+        # Circuit breaker for rate limiting
         self.openrouter_breaker = CircuitBreaker(cooldown_seconds=60, name="openrouter")
 
         # Metrics
         self.requests_total = 0
         self.ollama_requests = 0
-        self.groq_requests = 0
         self.openrouter_requests = 0
         self.fallback_count = 0
         self.oom_errors = 0
@@ -231,7 +220,7 @@ class InferenceRouter:
         temperature: float,
         cancellation_event: Optional[asyncio.Event] = None,
     ) -> str:
-        """Generate using cloud provider (Groq or OpenRouter).
+        """Generate using cloud provider (OpenRouter).
 
         Args:
             prompt: Input prompt
@@ -244,33 +233,10 @@ class InferenceRouter:
         Raises:
             Exception: If all cloud providers fail
         """
-        # Provider selection based on configuration
-        # - Groq: Faster (30 req/min free), but less reliable under load
-        # - OpenRouter: Slower, but more reliable for degradation scenarios
-        # Set INFERENCE_FALLBACK_PROVIDER=openrouter for degradation mode
+        if config.INFERENCE_FALLBACK_PROVIDER == "none":
+            raise Exception("Cloud fallback disabled by configuration")
 
-        # Try Groq first (faster, preferred) unless OpenRouter is explicitly configured
-        if self.groq and config.INFERENCE_FALLBACK_PROVIDER != "openrouter":
-            try:
-                self.groq_requests += 1
-                result = await self._await_with_cancellation(
-                    self.groq_breaker.call(
-                        self.groq.generate,
-                        prompt,
-                        model=config.INFERENCE_DEFAULT_MODEL,
-                        max_tokens=max_tokens,
-                        temperature=temperature,
-                    ),
-                    cancellation_event,
-                )
-                logger.info("Generated response using Groq")
-                return result
-            except (RateLimitError, CircuitBreakerOpenError) as e:
-                logger.warning(f"Groq unavailable: {e}, trying OpenRouter")
-            except Exception as e:
-                logger.error(f"Groq error: {e}, trying OpenRouter")
-
-        # Fallback to OpenRouter
+        # Use OpenRouter
         if self.openrouter:
             try:
                 self.openrouter_requests += 1
@@ -291,7 +257,7 @@ class InferenceRouter:
                 logger.error(f"OpenRouter error: {e}")
                 raise
 
-        raise Exception("No cloud providers available or all failed")
+        raise Exception("OpenRouter is not configured or request failed")
 
     async def _generate_with_model(
         self,
@@ -336,17 +302,7 @@ class InferenceRouter:
                 ),
                 cancellation_event,
             )
-        else:
-            # Groq model
-            if not self.groq:
-                raise ValueError("Groq not configured")
-            self.groq_requests += 1
-            return await self._await_with_cancellation(
-                self.groq.generate(
-                    prompt, model=model, max_tokens=max_tokens, temperature=temperature
-                ),
-                cancellation_event,
-            )
+        raise ValueError("Unsupported model format; only Ollama or OpenRouter models")
 
     async def _check_ollama_health(self) -> bool:
         """Check if Ollama is healthy and ready.
@@ -390,7 +346,6 @@ class InferenceRouter:
         return {
             "requests_total": self.requests_total,
             "ollama_requests": self.ollama_requests,
-            "groq_requests": self.groq_requests,
             "openrouter_requests": self.openrouter_requests,
             "fallback_count": self.fallback_count,
             "free_tier_downgrades": self.free_tier_downgrades,
@@ -400,7 +355,6 @@ class InferenceRouter:
                 else 0
             ),
             "oom_errors": self.oom_errors,
-            "groq_circuit_breaker": self.groq_breaker.get_metrics(),
             "openrouter_circuit_breaker": self.openrouter_breaker.get_metrics(),
         }
 

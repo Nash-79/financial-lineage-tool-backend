@@ -15,8 +15,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, Security, status, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, APIKeyHeader
+from fastapi.security.utils import get_authorization_scheme_param
 from pydantic import BaseModel
 
 from ..config import config
@@ -24,8 +25,19 @@ from ..config import config
 logger = logging.getLogger(__name__)
 
 # Security schemes
-bearer_scheme = HTTPBearer(auto_error=False)
+# bearer_scheme = CustomHTTPBearer(auto_error=False) # Removed due to compatibility issues
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def get_bearer_token(authorization: Optional[str] = Header(None, alias="Authorization")) -> Optional[HTTPAuthorizationCredentials]:
+    if not authorization:
+        return None
+    scheme, param = get_authorization_scheme_param(authorization)
+    if scheme.lower() != "bearer":
+        return None
+    return HTTPAuthorizationCredentials(scheme=scheme, credentials=param)
+
+async def get_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-Key")) -> Optional[str]:
+    return x_api_key
 
 
 # ==================== Models ====================
@@ -176,16 +188,14 @@ def verify_api_key(api_key: str) -> Optional[User]:
 
 
 async def get_current_user(
-    request: Request,
-    bearer_token: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    api_key: Optional[str] = Depends(api_key_header),
+    bearer_token: Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),
+    api_key: Optional[str] = Depends(get_api_key),
 ) -> User:
     """Get current authenticated user.
 
     Supports both JWT bearer tokens and API keys.
 
     Args:
-        request: FastAPI request object.
         bearer_token: Optional JWT bearer token.
         api_key: Optional API key header.
 
@@ -222,9 +232,8 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
-    request: Request,
-    bearer_token: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    api_key: Optional[str] = Depends(api_key_header),
+    bearer_token: Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),
+    api_key: Optional[str] = Depends(get_api_key),
 ) -> Optional[User]:
     """Get current user if authenticated, None otherwise.
 

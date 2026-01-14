@@ -56,11 +56,34 @@ class LocalConfig:
         "INFERENCE_FALLBACK_PROVIDER", "openrouter"
     )  # openrouter, none
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-    INFERENCE_DEFAULT_MODEL = os.getenv(
-        "INFERENCE_DEFAULT_MODEL", "llama-3.1-70b-versatile"
-    )
     OPENROUTER_REFERER = os.getenv(
         "OPENROUTER_REFERER", "https://github.com/your-repo"
+    )
+    # Free-tier models verified as $0/M input and $0/M output on OpenRouter
+    # See: https://openrouter.ai/models?q=:free
+    _DEFAULT_FREE_TIER_MODELS = [
+        "google/gemini-2.0-flash-exp:free",  # Fast, general-purpose, large context
+        "mistralai/mistral-7b-instruct:free",  # Balanced chat model
+        "mistralai/devstral-2512:free",  # 262K context, code/architecture specialist
+        "meta-llama/llama-3.1-8b-instruct:free",  # General chat
+        "deepseek/deepseek-r1-0528:free",  # 164K context, deep reasoning/CoT
+        "qwen/qwen3-4b:free",  # Fast, efficient for semantic/text tasks
+    ]
+    FREE_TIER_MODELS = [
+        model.strip()
+        for model in os.getenv(
+            "FREE_TIER_MODELS", ",".join(_DEFAULT_FREE_TIER_MODELS)
+        ).split(",")
+        if model.strip()
+    ]
+    DEFAULT_FREE_TIER_MODEL = os.getenv(
+        "DEFAULT_FREE_TIER_MODEL",
+        _DEFAULT_FREE_TIER_MODELS[0] if _DEFAULT_FREE_TIER_MODELS else "",
+    )
+    if DEFAULT_FREE_TIER_MODEL and DEFAULT_FREE_TIER_MODEL not in FREE_TIER_MODELS:
+        FREE_TIER_MODELS.append(DEFAULT_FREE_TIER_MODEL)
+    INFERENCE_DEFAULT_MODEL = os.getenv(
+        "INFERENCE_DEFAULT_MODEL", DEFAULT_FREE_TIER_MODEL
     )
 
     # Ollama settings
@@ -77,20 +100,24 @@ class LocalConfig:
     SIMILARITY_TOP_K = int(os.getenv("SIMILARITY_TOP_K", "5"))
 
     # Chat model routing (OpenRouter free-tier)
+    # Optimized routing based on model capabilities:
+    # - /deep: reasoning-first (DeepSeek R1 for CoT) with code fallback (Devstral)
+    # - /graph: code/structure-first (Devstral) with reasoning fallback (DeepSeek R1)
+    # - /semantic and /text: speed-first (Gemini, Qwen, Mistral 7B)
     CHAT_DEEP_PRIMARY_MODEL = os.getenv(
-        "CHAT_DEEP_PRIMARY_MODEL", "deepseek/deepseek-r1:free"
+        "CHAT_DEEP_PRIMARY_MODEL", "deepseek/deepseek-r1-0528:free"
     )
     CHAT_DEEP_SECONDARY_MODEL = os.getenv(
-        "CHAT_DEEP_SECONDARY_MODEL", "google/gemini-2.0-flash-exp:free"
+        "CHAT_DEEP_SECONDARY_MODEL", "mistralai/devstral-2512:free"
     )
     CHAT_DEEP_TERTIARY_MODEL = os.getenv(
-        "CHAT_DEEP_TERTIARY_MODEL", "meta-llama/llama-3.1-8b-instruct:free"
+        "CHAT_DEEP_TERTIARY_MODEL", "google/gemini-2.0-flash-exp:free"
     )
     CHAT_GRAPH_PRIMARY_MODEL = os.getenv(
         "CHAT_GRAPH_PRIMARY_MODEL", "mistralai/devstral-2512:free"
     )
     CHAT_GRAPH_SECONDARY_MODEL = os.getenv(
-        "CHAT_GRAPH_SECONDARY_MODEL", "meta-llama/llama-3.1-8b-instruct:free"
+        "CHAT_GRAPH_SECONDARY_MODEL", "deepseek/deepseek-r1-0528:free"
     )
     CHAT_GRAPH_TERTIARY_MODEL = os.getenv(
         "CHAT_GRAPH_TERTIARY_MODEL", "google/gemini-2.0-flash-exp:free"
@@ -99,19 +126,19 @@ class LocalConfig:
         "CHAT_SEMANTIC_PRIMARY_MODEL", "google/gemini-2.0-flash-exp:free"
     )
     CHAT_SEMANTIC_SECONDARY_MODEL = os.getenv(
-        "CHAT_SEMANTIC_SECONDARY_MODEL", "meta-llama/llama-3.1-8b-instruct:free"
+        "CHAT_SEMANTIC_SECONDARY_MODEL", "qwen/qwen3-4b:free"
     )
     CHAT_SEMANTIC_TERTIARY_MODEL = os.getenv(
         "CHAT_SEMANTIC_TERTIARY_MODEL", "mistralai/mistral-7b-instruct:free"
     )
     CHAT_TEXT_PRIMARY_MODEL = os.getenv(
-        "CHAT_TEXT_PRIMARY_MODEL", "meta-llama/llama-3.1-8b-instruct:free"
+        "CHAT_TEXT_PRIMARY_MODEL", "google/gemini-2.0-flash-exp:free"
     )
     CHAT_TEXT_SECONDARY_MODEL = os.getenv(
-        "CHAT_TEXT_SECONDARY_MODEL", "google/gemini-2.0-flash-exp:free"
+        "CHAT_TEXT_SECONDARY_MODEL", "mistralai/mistral-7b-instruct:free"
     )
     CHAT_TEXT_TERTIARY_MODEL = os.getenv(
-        "CHAT_TEXT_TERTIARY_MODEL", "mistralai/mistral-7b-instruct:free"
+        "CHAT_TEXT_TERTIARY_MODEL", "qwen/qwen3-4b:free"
     )
     CHAT_TITLE_PRIMARY_MODEL = os.getenv(
         "CHAT_TITLE_PRIMARY_MODEL", "google/gemini-2.0-flash-exp:free"
@@ -131,13 +158,13 @@ class LocalConfig:
     CHAT_TITLE_TEMPERATURE = float(os.getenv("CHAT_TITLE_TEMPERATURE", "0.2"))
 
     # Chat timeouts (seconds)
-    CHAT_TIMEOUT_DEEP_SECONDS = float(os.getenv("CHAT_TIMEOUT_DEEP_SECONDS", "90"))
-    CHAT_TIMEOUT_GRAPH_SECONDS = float(os.getenv("CHAT_TIMEOUT_GRAPH_SECONDS", "45"))
+    CHAT_TIMEOUT_DEEP_SECONDS = float(os.getenv("CHAT_TIMEOUT_DEEP_SECONDS", "120"))
+    CHAT_TIMEOUT_GRAPH_SECONDS = float(os.getenv("CHAT_TIMEOUT_GRAPH_SECONDS", "60"))
     CHAT_TIMEOUT_SEMANTIC_SECONDS = float(
-        os.getenv("CHAT_TIMEOUT_SEMANTIC_SECONDS", "45")
+        os.getenv("CHAT_TIMEOUT_SEMANTIC_SECONDS", "60")
     )
-    CHAT_TIMEOUT_TEXT_SECONDS = float(os.getenv("CHAT_TIMEOUT_TEXT_SECONDS", "30"))
-    CHAT_TIMEOUT_TITLE_SECONDS = float(os.getenv("CHAT_TIMEOUT_TITLE_SECONDS", "30"))
+    CHAT_TIMEOUT_TEXT_SECONDS = float(os.getenv("CHAT_TIMEOUT_TEXT_SECONDS", "45"))
+    CHAT_TIMEOUT_TITLE_SECONDS = float(os.getenv("CHAT_TIMEOUT_TITLE_SECONDS", "45"))
 
     # Chat fallback behavior
     CHAT_RETRY_BASE_DELAY_SECONDS = float(
@@ -156,6 +183,16 @@ class LocalConfig:
     CHAT_DEEP_GRAPH_HOPS = int(os.getenv("CHAT_DEEP_GRAPH_HOPS", "2"))
     CHAT_GRAPH_MAX_HOPS = int(os.getenv("CHAT_GRAPH_MAX_HOPS", "3"))
     CHAT_STREAM_CHUNK_SIZE = int(os.getenv("CHAT_STREAM_CHUNK_SIZE", "200"))
+    _DEFAULT_CHAT_JSON_MODELS = [
+        "deepseek/deepseek-r1-0528:free",
+    ]
+    CHAT_JSON_MODELS = [
+        model.strip()
+        for model in os.getenv(
+            "CHAT_JSON_MODELS", ",".join(_DEFAULT_CHAT_JSON_MODELS)
+        ).split(",")
+        if model.strip()
+    ]
 
     # Qdrant settings
     QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
@@ -193,6 +230,11 @@ class LocalConfig:
     )
     DUCKDB_SNAPSHOT_RETENTION_COUNT = int(
         os.getenv("DUCKDB_SNAPSHOT_RETENTION_COUNT", "5")
+    )
+
+    # Chat artifact retention (days before cleanup)
+    CHAT_ARTIFACT_RETENTION_DAYS = int(
+        os.getenv("CHAT_ARTIFACT_RETENTION_DAYS", "90")
     )
 
     # File upload settings

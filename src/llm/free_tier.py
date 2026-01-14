@@ -4,15 +4,11 @@ from __future__ import annotations
 
 from typing import Optional, Tuple
 
+from src.api.config import config
 
-DEFAULT_FREE_TIER_MODEL = "google/gemini-2.0-flash-exp:free"
-FREE_TIER_MODELS = {
-    "google/gemini-2.0-flash-exp:free",
-    "mistralai/mistral-7b-instruct:free",
-    "mistralai/devstral-2512:free",
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "deepseek/deepseek-r1:free",
-}
+
+DEFAULT_FREE_TIER_MODEL = config.DEFAULT_FREE_TIER_MODEL
+FREE_TIER_MODELS = set(config.FREE_TIER_MODELS) | {"qwen/qwen3-4b:free"}
 
 
 def enforce_free_tier(model: Optional[str]) -> Tuple[str, bool]:

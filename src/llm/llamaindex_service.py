@@ -531,7 +531,6 @@ Answer:"""
             },
             "router_metrics": {
                 "ollama_requests": router_metrics.get("ollama_requests", 0),
-                "groq_requests": router_metrics.get("groq_requests", 0),
                 "openrouter_requests": router_metrics.get("openrouter_requests", 0),
                 "fallback_rate": router_metrics.get("fallback_rate", 0),
                 "oom_errors": router_metrics.get("oom_errors", 0),

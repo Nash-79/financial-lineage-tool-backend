@@ -68,17 +68,14 @@ Production configuration validation failed:
 **Inference Fallback** (cloud providers for OOM prevention):
 
 ```bash
-# Inference fallback provider (optional, default: groq)
-INFERENCE_FALLBACK_PROVIDER=groq  # Options: groq, openrouter, none
-
-# Groq API (free tier: 30 req/min)
-GROQ_API_KEY=your-groq-api-key  # Get from https://console.groq.com/
+# Inference fallback provider (optional, default: openrouter)
+INFERENCE_FALLBACK_PROVIDER=openrouter  # Options: openrouter, none
 
 # OpenRouter API (free tier available)
 OPENROUTER_API_KEY=your-openrouter-key  # Get from https://openrouter.ai/
 
-# Default cloud model
-INFERENCE_DEFAULT_MODEL=llama-3.1-70b-versatile
+# Default cloud model (OpenRouter free-tier)
+INFERENCE_DEFAULT_MODEL=google/gemini-2.0-flash-exp:free
 ```
 
 **Observability** (SigNoz/OpenTelemetry):

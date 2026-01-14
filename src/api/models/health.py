@@ -19,8 +19,9 @@ class HealthResponse(BaseModel):
 class RAGStatusResponse(BaseModel):
     """Response model for RAG status endpoint."""
 
-    mode: str  # "llamaindex" or "legacy"
+    mode: str  # "hybrid", "llamaindex", or "legacy"
     total_queries: int
     cache_hit_rate: float
     avg_latency_ms: float
     status: str
+    chat_metrics: Dict[str, Any] | None = None

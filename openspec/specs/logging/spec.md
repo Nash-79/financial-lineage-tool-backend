@@ -246,3 +246,95 @@ The system SHALL log pre-ingestion Neo4j snapshot artifacts.
 - **AND** log entry includes node and edge counts
 - **AND** log entry includes project name and ingestion_id
 
+### Requirement: Ingestion Log Index Metadata
+The system SHALL persist an ingestion log index entry for each ingestion run.
+
+#### Scenario: Create ingestion log index
+- **WHEN** an ingestion session starts
+- **THEN** the system records an index entry containing ingestion_id, source, project_id, repository_id, run_id, filenames, and started_at
+- **AND** the entry is updated with status, project_status, and completed_at when the session finishes
+- **AND** entries are ordered by most recent completion time by default
+
+### Requirement: Ingestion Pipeline Stage Telemetry
+The ingestion log SHALL include structured stage events for key pipeline steps.
+
+#### Scenario: Stage events recorded
+- **WHEN** parsing, chunking, embedding, indexing, or LLM inference is executed
+- **THEN** the system records stage events with stage name, status (started/completed/failed), and summary metrics
+- **AND** failed stages include error details
+- **AND** stages that are not applicable are recorded as skipped
+
+### Requirement: Ingestion Session Log Persistence
+The system SHALL persist a structured log file for each ingestion session.
+
+#### Scenario: Ingestion log file creation
+- **WHEN** an ingestion session starts
+- **THEN** the system creates a JSONL log file for the session
+- **AND** the log file name includes the ingestion_id
+- **AND** each log entry includes timestamp, event type, and payload
+- **AND** log entries are appended in chronological order
+
+### Requirement: On-Demand Verbose Ingestion Logging
+The system SHALL support a verbose mode per ingestion session for debugging.
+
+#### Scenario: Verbose mode enabled
+- **WHEN** an ingestion request sets verbose to true
+- **THEN** the ingestion log includes detailed file-level events
+- **AND** verbose events are only recorded for that session
+- **AND** standard logging behavior remains unchanged for other sessions
+
+### Requirement: OpenTelemetry Export
+The system SHALL export logs, traces, and metrics via OTLP when enabled.
+
+#### Scenario: OTLP export enabled
+- **WHEN** OTEL_EXPORTER_OTLP_ENDPOINT is configured
+- **THEN** the system exports traces and logs to the OTLP endpoint
+- **AND** the service name is included in telemetry attributes
+- **AND** export failures are logged without crashing the API
+
+### Requirement: Structured Log Export
+The system SHALL forward structured logs to the OpenTelemetry pipeline.
+
+#### Scenario: Log forwarding
+- **WHEN** the API emits logs
+- **THEN** logs are forwarded to OTLP as log records
+- **AND** logs include level, message, and module context
+
+### Requirement: Custom RAG Observability Metrics
+The system SHALL emit custom OpenTelemetry metrics for RAG pipeline operations and performance monitoring.
+
+#### Scenario: RAG query latency metrics
+- **WHEN** RAG query is executed
+- **THEN** system emits histogram metric "rag.query.latency_ms" with labels (endpoint, cache_hit)
+- **AND** it tracks p50, p95, p99 latencies
+- **AND** metrics are exported to OTLP endpoint
+- **AND** metrics can be visualized in SigNoz/Grafana
+
+#### Scenario: Cache performance metrics
+- **WHEN** embedding or query cache is accessed
+- **THEN** system emits counter metrics "rag.cache.hits" and "rag.cache.misses"
+- **AND** it emits gauge metric "rag.cache.hit_rate" updated every 60 seconds
+- **AND** metrics include labels (cache_type: embedding|query)
+- **AND** alerting can be configured on hit_rate < 0.4
+
+#### Scenario: Ollama OOM error tracking
+- **WHEN** Ollama returns OOM error
+- **THEN** system emits counter metric "ollama.oom_errors" with labels (model, context_size)
+- **AND** it increments counter immediately on error
+- **AND** alert is triggered for any OOM error count > 0
+- **AND** metric helps diagnose memory issues
+
+#### Scenario: Inference routing metrics
+- **WHEN** inference request is routed
+- **THEN** system emits counter metric "inference.requests" with labels (provider: ollama|groq|openrouter, success: true|false)
+- **AND** it tracks fallback rate (groq_requests / total_requests)
+- **AND** it emits cost estimate gauge "inference.estimated_cost_usd"
+- **AND** metrics show cost savings from local-first strategy
+
+#### Scenario: SLO compliance metrics
+- **WHEN** system processes requests
+- **THEN** it tracks SLO compliance for each endpoint
+- **AND** it emits gauge "slo.latency_p95_ms" with target threshold
+- **AND** it emits gauge "slo.availability_pct" updated every 5 minutes
+- **AND** dashboards show red/yellow/green SLO status
+

@@ -2,7 +2,7 @@
 """
 Benchmark LLM models for SQL lineage question answering quality.
 
-Tests multiple models (Ollama, Groq, OpenRouter) against ground truth Q&A
+Tests multiple models (Ollama, OpenRouter) against ground truth Q&A
 dataset to measure accuracy, citation quality, hallucination rate, and latency.
 
 Usage:

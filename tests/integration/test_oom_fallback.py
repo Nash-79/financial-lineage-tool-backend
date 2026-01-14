@@ -16,10 +16,9 @@ class TestOOMFallbackIntegration:
     def mock_config(self):
         """Mock configuration with all providers enabled."""
         with patch("src.llm.inference_router.config") as mock_cfg:
-            mock_cfg.GROQ_API_KEY = "test-groq-key"
             mock_cfg.OPENROUTER_API_KEY = "test-openrouter-key"
-            mock_cfg.INFERENCE_FALLBACK_PROVIDER = "groq"
-            mock_cfg.INFERENCE_DEFAULT_MODEL = "llama-3.1-70b-versatile"
+            mock_cfg.INFERENCE_FALLBACK_PROVIDER = "openrouter"
+            mock_cfg.INFERENCE_DEFAULT_MODEL = "google/gemini-2.0-flash-exp:free"
             mock_cfg.OLLAMA_HOST = "http://localhost:11434"
             mock_cfg.get_llm_model.return_value = "llama3.1:8b"
             yield mock_cfg
@@ -32,8 +31,10 @@ class TestOOMFallbackIntegration:
         return service
 
     @pytest.mark.asyncio
-    async def test_oom_fallback_local_to_groq(self, mock_config, mock_ollama_service):
-        """Test automatic fallback from local Ollama OOM to Groq."""
+    async def test_oom_fallback_local_to_openrouter(
+        self, mock_config, mock_ollama_service
+    ):
+        """Test automatic fallback from local Ollama OOM to OpenRouter."""
         router = InferenceRouter(
             mode="local-first",
             ollama_service=mock_ollama_service,
@@ -46,9 +47,9 @@ class TestOOMFallbackIntegration:
                 "CUDA out of memory error"
             )
 
-            # Mock Groq success
+            # Mock OpenRouter success
             with patch.object(
-                router.groq, "generate", return_value="Groq fallback response"
+                router.openrouter, "generate", return_value="OpenRouter response"
             ):
                 result = await router.generate(
                     prompt="Explain SQL lineage for ORDERS table",
@@ -57,11 +58,11 @@ class TestOOMFallbackIntegration:
                 )
 
                 # Verify fallback occurred
-                assert result == "Groq fallback response"
+                assert result == "OpenRouter response"
                 assert router.oom_errors == 1
                 assert router.fallback_count == 1
                 assert router.ollama_requests == 1
-                assert router.groq_requests == 1
+                assert router.openrouter_requests == 1
 
                 # Verify metrics
                 metrics = router.get_metrics()
@@ -69,10 +70,10 @@ class TestOOMFallbackIntegration:
                 assert metrics["oom_errors"] == 1
 
     @pytest.mark.asyncio
-    async def test_oom_fallback_groq_to_openrouter(
+    async def test_oom_fallback_openrouter_rate_limit(
         self, mock_config, mock_ollama_service
     ):
-        """Test fallback chain: Ollama OOM -> Groq rate limit -> OpenRouter."""
+        """Test fallback chain: Ollama OOM -> OpenRouter rate limit."""
         router = InferenceRouter(
             mode="local-first",
             ollama_service=mock_ollama_service,
@@ -82,28 +83,21 @@ class TestOOMFallbackIntegration:
             # Mock Ollama OOM
             mock_ollama_service.generate.side_effect = Exception("out of memory")
 
-            # Mock Groq rate limit
             from src.llm.circuit_breaker import RateLimitError
 
-            async def groq_rate_limited(*args, **kwargs):
-                raise RateLimitError("Groq rate limit")
-
-            # Mock OpenRouter success
+            # Mock OpenRouter rate limit
             with patch.object(
-                router.groq_breaker, "call", side_effect=groq_rate_limited
+                router.openrouter, "generate", side_effect=RateLimitError("Rate limit")
             ):
-                with patch.object(
-                    router.openrouter, "generate", return_value="OpenRouter response"
-                ):
-                    result = await router.generate(
+                with pytest.raises(Exception) as exc_info:
+                    await router.generate(
                         prompt="Test prompt",
                         max_tokens=100,
                         temperature=0.7,
                     )
 
-                    assert result == "OpenRouter response"
-                    assert router.oom_errors == 1
-                    assert router.openrouter_requests == 1
+                assert "Rate limit" in str(exc_info.value)
+                assert router.oom_errors == 1
 
     @pytest.mark.asyncio
     async def test_large_query_skips_ollama(self, mock_config, mock_ollama_service):
@@ -117,16 +111,18 @@ class TestOOMFallbackIntegration:
         large_prompt = "SELECT * FROM table WHERE condition " * 400
 
         with patch.object(router, "_check_ollama_health", return_value=True):
-            with patch.object(router.groq, "generate", return_value="Groq response"):
+            with patch.object(
+                router.openrouter, "generate", return_value="OpenRouter response"
+            ):
                 result = await router.generate(
                     prompt=large_prompt,
                     max_tokens=2048,
                 )
 
                 # Should skip Ollama due to size
-                assert result == "Groq response"
+                assert result == "OpenRouter response"
                 assert router.ollama_requests == 0  # Should not attempt Ollama
-                assert router.groq_requests == 1
+                assert router.openrouter_requests == 1
                 assert router.oom_errors == 0  # No OOM since we skipped Ollama
 
     @pytest.mark.asyncio
@@ -158,9 +154,9 @@ class TestOOMFallbackIntegration:
                         "out of memory"
                     )
 
-                    # Mock Groq success
+                    # Mock OpenRouter success
                     with patch.object(
-                        service.inference_router.groq,
+                        service.inference_router.openrouter,
                         "generate",
                         return_value="The ORDERS table contains order data...",
                     ):
@@ -185,7 +181,7 @@ class TestOOMFallbackIntegration:
                             assert "ORDERS table" in result["response"]
                             assert result["fallback_used"] is True
                             assert result["router_metrics"]["oom_errors"] == 1
-                            assert result["router_metrics"]["groq_requests"] == 1
+                            assert result["router_metrics"]["openrouter_requests"] == 1
 
     @pytest.mark.asyncio
     async def test_context_trimming_prevents_oom(self, mock_config):
@@ -295,20 +291,24 @@ class TestOOMFallbackIntegration:
             mock_ollama_service.generate.return_value = {"response": "Response 1"}
             await router.generate("Query 1")
 
-            # Query 2: Ollama OOM -> Groq fallback
+            # Query 2: Ollama OOM -> OpenRouter fallback
             mock_ollama_service.generate.side_effect = Exception("out of memory")
-            with patch.object(router.groq, "generate", return_value="Groq 2"):
+            with patch.object(
+                router.openrouter, "generate", return_value="OpenRouter 2"
+            ):
                 await router.generate("Query 2")
 
-            # Query 3: Ollama OOM -> Groq fallback again
-            with patch.object(router.groq, "generate", return_value="Groq 3"):
+            # Query 3: Ollama OOM -> OpenRouter fallback again
+            with patch.object(
+                router.openrouter, "generate", return_value="OpenRouter 3"
+            ):
                 await router.generate("Query 3")
 
             # Verify accumulated metrics
             metrics = router.get_metrics()
             assert metrics["requests_total"] == 3
             assert metrics["ollama_requests"] == 3  # All attempted Ollama first
-            assert metrics["groq_requests"] == 2  # 2 fallbacks
+            assert metrics["openrouter_requests"] == 2  # 2 fallbacks
             assert metrics["oom_errors"] == 2
             assert metrics["fallback_count"] == 2
             assert metrics["fallback_rate"] == pytest.approx(0.666, rel=0.01)
@@ -325,28 +325,25 @@ class TestOOMFallbackIntegration:
             ollama_service=mock_ollama_service,
         )
 
-        # First request: Groq rate limit
-        async def groq_rate_limit(*args, **kwargs):
+        # First request: OpenRouter rate limit opens circuit
+        async def openrouter_rate_limit(*args, **kwargs):
             raise RateLimitError("Rate limit exceeded")
 
-        with patch.object(router.groq_breaker, "call", side_effect=groq_rate_limit):
-            with patch.object(
-                router.openrouter, "generate", return_value="OpenRouter 1"
-            ):
-                result1 = await router.generate("Query 1")
-                assert result1 == "OpenRouter 1"
+        with patch.object(
+            router.openrouter, "generate", side_effect=openrouter_rate_limit
+        ):
+            with pytest.raises(Exception):
+                await router.generate("Query 1")
 
-        # Circuit should now be open for Groq
-        assert router.groq_breaker.state == "open"
+        # Circuit should now be open for OpenRouter
+        assert router.openrouter_breaker.state == "open"
 
-        # Second request: Circuit breaker should prevent Groq attempt
-        with patch.object(router.openrouter, "generate", return_value="OpenRouter 2"):
-            result2 = await router.generate("Query 2")
-            assert result2 == "OpenRouter 2"
+        # Second request: Circuit breaker should prevent OpenRouter attempt
+        with pytest.raises(Exception):
+            await router.generate("Query 2")
 
-            # Groq should not have been called due to circuit breaker
-            metrics = router.groq_breaker.get_metrics()
-            assert metrics["state"] == "open"
+        metrics = router.openrouter_breaker.get_metrics()
+        assert metrics["state"] == "open"
 
     @pytest.mark.asyncio
     async def test_quantized_model_selection_reduces_oom(self, mock_config):
@@ -386,14 +383,16 @@ class TestOOMFallbackIntegration:
             ollama_service=mock_ollama_service,
         )
 
-        # User explicitly selects Groq model
-        with patch.object(router.groq, "generate", return_value="Groq direct"):
+        # User explicitly selects OpenRouter model
+        with patch.object(
+            router.openrouter, "generate", return_value="OpenRouter direct"
+        ):
             result = await router.generate(
                 prompt="Test",
-                user_selected_model="llama-3.1-70b-versatile",
+                user_selected_model="meta-llama/llama-3.1-8b-instruct:free",
             )
 
-            # Should use Groq directly, skipping health checks and routing
-            assert result == "Groq direct"
+            # Should use OpenRouter directly, skipping health checks and routing
+            assert result == "OpenRouter direct"
             assert router.ollama_requests == 0  # Ollama should be skipped
-            assert router.groq_requests == 1
+            assert router.openrouter_requests == 1

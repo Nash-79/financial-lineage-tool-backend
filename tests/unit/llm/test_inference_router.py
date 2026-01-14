@@ -13,10 +13,9 @@ class TestInferenceRouter:
     def mock_config(self):
         """Mock configuration."""
         with patch("src.llm.inference_router.config") as mock_cfg:
-            mock_cfg.GROQ_API_KEY = "test-groq-key"
             mock_cfg.OPENROUTER_API_KEY = "test-openrouter-key"
-            mock_cfg.INFERENCE_FALLBACK_PROVIDER = "groq"
-            mock_cfg.INFERENCE_DEFAULT_MODEL = "llama-3.1-70b-versatile"
+            mock_cfg.INFERENCE_FALLBACK_PROVIDER = "openrouter"
+            mock_cfg.INFERENCE_DEFAULT_MODEL = "google/gemini-2.0-flash-exp:free"
             mock_cfg.OLLAMA_HOST = "http://localhost:11434"
             mock_cfg.get_llm_model.return_value = "llama3.1:8b"
             yield mock_cfg
@@ -46,11 +45,9 @@ class TestInferenceRouter:
 
         assert router.mode == "local-first"
         assert router.ollama is not None
-        assert router.groq is not None  # Should initialize with API key
         assert router.openrouter is not None
         assert router.requests_total == 0
         assert router.ollama_requests == 0
-        assert router.groq_requests == 0
         assert router.openrouter_requests == 0
         assert router.fallback_count == 0
         assert router.oom_errors == 0
@@ -79,7 +76,6 @@ class TestInferenceRouter:
     async def test_initialization_without_api_keys(self, mock_ollama_service):
         """Test initialization when API keys are not set."""
         with patch("src.llm.inference_router.config") as mock_cfg:
-            mock_cfg.GROQ_API_KEY = ""
             mock_cfg.OPENROUTER_API_KEY = ""
             mock_cfg.OLLAMA_HOST = "http://localhost:11434"
             mock_cfg.get_llm_model.return_value = "llama3.1:8b"
@@ -89,7 +85,6 @@ class TestInferenceRouter:
                 ollama_service=mock_ollama_service,
             )
 
-            assert router.groq is None
             assert router.openrouter is None
 
     @pytest.mark.asyncio
@@ -111,7 +106,6 @@ class TestInferenceRouter:
             assert result == "Test response from Ollama"
             assert router.requests_total == 1
             assert router.ollama_requests == 1
-            assert router.groq_requests == 0
             assert router.fallback_count == 0
 
     @pytest.mark.asyncio
@@ -122,9 +116,9 @@ class TestInferenceRouter:
             # Mock Ollama to raise OOM error
             router.ollama.generate.side_effect = Exception("out of memory")
 
-            # Mock Groq fallback
+            # Mock OpenRouter fallback
             with patch.object(
-                router.groq, "generate", new=AsyncMock(return_value="Groq response")
+                router.openrouter, "generate", new=AsyncMock(return_value="OR response")
             ):
                 result = await router.generate(
                     prompt="Test prompt",
@@ -132,10 +126,10 @@ class TestInferenceRouter:
                     temperature=0.7,
                 )
 
-                assert result == "Groq response"
+                assert result == "OR response"
                 assert router.requests_total == 1
                 assert router.ollama_requests == 1
-                assert router.groq_requests == 1
+                assert router.openrouter_requests == 1
                 assert router.fallback_count == 1
                 assert router.oom_errors == 1
 
@@ -146,9 +140,11 @@ class TestInferenceRouter:
         large_prompt = "A" * 15000
 
         with patch.object(router, "_check_ollama_health", return_value=True):
-            # Mock Groq
+            # Mock OpenRouter
             with patch.object(
-                router.groq, "generate", new=AsyncMock(return_value="Groq response")
+                router.openrouter,
+                "generate",
+                new=AsyncMock(return_value="OR response"),
             ):
                 result = await router.generate(
                     prompt=large_prompt,
@@ -156,9 +152,9 @@ class TestInferenceRouter:
                     temperature=0.7,
                 )
 
-                assert result == "Groq response"
+                assert result == "OR response"
                 assert router.ollama_requests == 0  # Should skip Ollama
-                assert router.groq_requests == 1
+                assert router.openrouter_requests == 1
                 assert router.fallback_count == 1
 
     @pytest.mark.asyncio
@@ -166,9 +162,11 @@ class TestInferenceRouter:
         """Test fallback when Ollama is unhealthy."""
         # Mock Ollama health check to fail
         with patch.object(router, "_check_ollama_health", return_value=False):
-            # Mock Groq
+            # Mock OpenRouter
             with patch.object(
-                router.groq, "generate", new=AsyncMock(return_value="Groq response")
+                router.openrouter,
+                "generate",
+                new=AsyncMock(return_value="OR response"),
             ):
                 result = await router.generate(
                     prompt="Test prompt",
@@ -176,9 +174,9 @@ class TestInferenceRouter:
                     temperature=0.7,
                 )
 
-                assert result == "Groq response"
+                assert result == "OR response"
                 assert router.ollama_requests == 0
-                assert router.groq_requests == 1
+                assert router.openrouter_requests == 1
                 assert router.fallback_count == 1
 
     @pytest.mark.asyncio
@@ -187,7 +185,7 @@ class TestInferenceRouter:
         router.mode = "cloud-only"
 
         with patch.object(
-            router.groq, "generate", new=AsyncMock(return_value="Groq response")
+            router.openrouter, "generate", new=AsyncMock(return_value="OR response")
         ):
             result = await router.generate(
                 prompt="Test prompt",
@@ -195,9 +193,9 @@ class TestInferenceRouter:
                 temperature=0.7,
             )
 
-            assert result == "Groq response"
+            assert result == "OR response"
             assert router.ollama_requests == 0
-            assert router.groq_requests == 1
+            assert router.openrouter_requests == 1
 
     @pytest.mark.asyncio
     async def test_generate_local_only_mode(self, router):
@@ -214,7 +212,7 @@ class TestInferenceRouter:
 
         assert result == "Ollama response"
         assert router.ollama_requests == 1
-        assert router.groq_requests == 0
+        assert router.openrouter_requests == 0
 
     @pytest.mark.asyncio
     async def test_generate_with_user_selected_model_ollama(self, router):
@@ -230,18 +228,6 @@ class TestInferenceRouter:
         router.ollama.generate.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_generate_with_user_selected_model_groq(self, router):
-        """Test generation with user-selected Groq model."""
-        with patch.object(
-            router.groq, "generate", new=AsyncMock(return_value="Groq custom")
-        ):
-            result = await router.generate(
-                prompt="Test",
-                user_selected_model="llama-3.1-70b-versatile",
-            )
-
-            assert result == "Groq custom"
-
     @pytest.mark.asyncio
     async def test_generate_with_user_selected_model_openrouter(self, router):
         """Test generation with user-selected OpenRouter model."""
@@ -274,35 +260,11 @@ class TestInferenceRouter:
             assert router.free_tier_downgrades == 1
 
     @pytest.mark.asyncio
-    async def test_generate_cloud_groq_rate_limit_fallback_to_openrouter(self, router):
-        """Test fallback from Groq to OpenRouter on rate limit."""
-
-        # Mock Groq to raise rate limit error
-        async def groq_generate(*args, **kwargs):
-            raise RateLimitError("Rate limit exceeded")
-
-        with patch.object(router.groq_breaker, "call", side_effect=groq_generate):
-            # Mock OpenRouter success
-            with patch.object(
-                router.openrouter,
-                "generate",
-                new=AsyncMock(return_value="OpenRouter response"),
-            ):
-                result = await router._generate_cloud(
-                    prompt="Test",
-                    max_tokens=100,
-                    temperature=0.7,
-                )
-
-                assert result == "OpenRouter response"
-                assert router.openrouter_requests == 1
-
     @pytest.mark.asyncio
     async def test_generate_cloud_openrouter_enforces_free_tier(
         self, router, mock_config
     ):
         """Test OpenRouter fallback enforces free-tier models."""
-        mock_config.INFERENCE_FALLBACK_PROVIDER = "openrouter"
         mock_config.INFERENCE_DEFAULT_MODEL = "openai/gpt-4o"
 
         with patch.object(
@@ -375,21 +337,18 @@ class TestInferenceRouter:
 
         assert "requests_total" in metrics
         assert "ollama_requests" in metrics
-        assert "groq_requests" in metrics
         assert "openrouter_requests" in metrics
         assert "fallback_count" in metrics
         assert "free_tier_downgrades" in metrics
         assert "fallback_rate" in metrics
         assert "oom_errors" in metrics
-        assert "groq_circuit_breaker" in metrics
         assert "openrouter_circuit_breaker" in metrics
 
     def test_get_metrics_with_data(self, router):
         """Test metrics after some requests."""
         router.requests_total = 10
         router.ollama_requests = 7
-        router.groq_requests = 2
-        router.openrouter_requests = 1
+        router.openrouter_requests = 3
         router.fallback_count = 3
         router.oom_errors = 1
 
@@ -397,8 +356,7 @@ class TestInferenceRouter:
 
         assert metrics["requests_total"] == 10
         assert metrics["ollama_requests"] == 7
-        assert metrics["groq_requests"] == 2
-        assert metrics["openrouter_requests"] == 1
+        assert metrics["openrouter_requests"] == 3
         assert metrics["fallback_count"] == 3
         assert metrics["fallback_rate"] == 0.3
         assert metrics["oom_errors"] == 1
@@ -442,11 +400,8 @@ class TestInferenceRouter:
     async def test_circuit_breaker_integration(self, router):
         """Test circuit breaker integration with cloud providers."""
         # This test verifies that circuit breakers are initialized
-        assert router.groq_breaker is not None
         assert router.openrouter_breaker is not None
-        assert router.groq_breaker.name == "groq"
         assert router.openrouter_breaker.name == "openrouter"
-        assert router.groq_breaker.cooldown_seconds == 60
         assert router.openrouter_breaker.cooldown_seconds == 60
 
     @pytest.mark.asyncio
@@ -454,25 +409,19 @@ class TestInferenceRouter:
         """Test error handling when all providers fail."""
         router.mode = "cloud-only"
 
-        # Mock both providers to fail
-        async def groq_fail(*args, **kwargs):
-            raise RateLimitError("Groq rate limit")
+        with patch.object(
+            router.openrouter_breaker,
+            "call",
+            side_effect=RateLimitError("Rate limit exceeded"),
+        ):
+            with pytest.raises(Exception) as exc_info:
+                await router._generate_cloud("Test", 100, 0.7)
 
-        with patch.object(router.groq_breaker, "call", side_effect=groq_fail):
-            with patch.object(
-                router.openrouter,
-                "generate",
-                new=AsyncMock(side_effect=Exception("OR error")),
-            ):
-                with pytest.raises(Exception) as exc_info:
-                    await router._generate_cloud("Test", 100, 0.7)
-
-                assert "OR error" in str(exc_info.value)
+            assert "Rate limit exceeded" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_openrouter_preferred_when_configured(self, router, mock_config):
-        """Test OpenRouter is used when configured as preferred provider."""
-        mock_config.INFERENCE_FALLBACK_PROVIDER = "openrouter"
+    async def test_openrouter_used_when_configured(self, router):
+        """Test OpenRouter is used for cloud routing."""
 
         with patch.object(
             router.openrouter,
@@ -483,5 +432,3 @@ class TestInferenceRouter:
 
             assert result == "OpenRouter response"
             assert router.openrouter_requests == 1
-            # Groq should not be called when OpenRouter is preferred
-            assert router.groq_requests == 0

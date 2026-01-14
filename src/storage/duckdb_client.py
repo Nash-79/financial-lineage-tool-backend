@@ -59,6 +59,89 @@ class DuckDBClient:
             )
             logger.info("Snapshot manager enabled for in-memory mode")
 
+    async def save_chat_artifact(
+        self,
+        session_id: str,
+        message_id: str,
+        artifact_type: str,
+        content: Dict[str, Any],
+    ) -> bool:
+        """
+        Save a chat artifact (e.g., lineage graph) for a specific message.
+
+        Args:
+            session_id: Chat session identifier
+            message_id: Message identifier within session
+            artifact_type: Type of artifact (e.g., 'graph')
+            content: JSON content of the artifact
+
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        if not self.conn:
+            logger.error("DuckDB connection not initialized")
+            return False
+
+        try:
+            import json
+
+            content_json = json.dumps(content)
+            async with self._write_lock:
+                # Upsert artifact
+                self.conn.execute(
+                    """
+                    INSERT INTO chat_artifacts (session_id, message_id, artifact_type, artifact_data)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (session_id, message_id, artifact_type) 
+                    DO UPDATE SET artifact_data = excluded.artifact_data, created_at = CURRENT_TIMESTAMP
+                """,
+                    [session_id, message_id, artifact_type, content_json],
+                )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save chat artifact: {e}")
+            return False
+
+    async def get_chat_artifact(
+        self,
+        session_id: str,
+        message_id: str,
+        artifact_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve a chat artifact by its identifiers.
+
+        Args:
+            session_id: Chat session identifier
+            message_id: Message identifier within session
+            artifact_type: Type of artifact (e.g., 'graph')
+
+        Returns:
+            Dictionary payload of the artifact if found, None otherwise
+        """
+        if not self.conn:
+            logger.error("DuckDB connection not initialized")
+            return None
+
+        try:
+            import json
+
+            result = self.conn.execute(
+                """
+                SELECT artifact_data 
+                FROM chat_artifacts 
+                WHERE session_id = ? AND message_id = ? AND artifact_type = ?
+            """,
+                [session_id, message_id, artifact_type],
+            ).fetchone()
+
+            if result and result[0]:
+                return json.loads(result[0])
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get chat artifact: {e}")
+            return None
+
     def initialize(self) -> None:
         """
         Initialize DuckDB connection and create schema.
@@ -145,7 +228,7 @@ class DuckDBClient:
         # Check current version
         result = self.conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
         current_version = result[0] if result and result[0] else 0
-        target_version = 6
+        target_version = 7
 
         # Migration status banner
         logger.info("=" * 70)
@@ -207,6 +290,15 @@ class DuckDBClient:
                 "Migration 5 -> 6 completed successfully (files table rebuild + project links)"
             )
             current_version = 6
+
+        if current_version == 6:
+            # V7: Add chat_artifacts table for message-scoped graph data persistence
+            self._migrate_to_v7()
+            self.conn.execute("INSERT INTO schema_version (version) VALUES (7)")
+            logger.info(
+                "Migration 6 -> 7 completed successfully (chat artifacts table)"
+            )
+            current_version = 7
 
         self._ensure_file_macros()
 
@@ -657,6 +749,51 @@ class DuckDBClient:
             "Rebuilt files table without primary key and created project_links table"
         )
 
+    def _migrate_to_v7(self) -> None:
+        """
+        Migrate schema from v6 to v7: Add chat_artifacts table.
+
+        WHAT: Create chat_artifacts table for message-scoped graph data persistence
+        WHY: Allow users to retrieve answer-specific lineage graphs after conversation advances
+        WHEN: 2026-01-14 (update-chat-models-and-lineage OpenSpec change)
+
+        SCHEMA CHANGES:
+        - CREATE TABLE chat_artifacts
+          - session_id: TEXT NOT NULL (chat session identifier)
+          - message_id: TEXT NOT NULL (message identifier within session)
+          - artifact_type: TEXT NOT NULL (e.g., "graph" for lineage graphs)
+          - artifact_data: JSON NOT NULL (the artifact payload)
+          - created_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          - PRIMARY KEY (session_id, message_id, artifact_type)
+        - CREATE INDEX idx_chat_artifacts_created_at (for cleanup queries)
+
+        DATA MIGRATION: None (new table)
+        ROLLBACK: DROP TABLE chat_artifacts
+        RISK LEVEL: Low (additive change only)
+        AFFECTED FEATURES: Chat artifact persistence and retrieval API
+        """
+        if not self.conn:
+            raise RuntimeError("DuckDB connection not initialized")
+
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_artifacts (
+                session_id TEXT NOT NULL,
+                message_id TEXT NOT NULL,
+                artifact_type TEXT NOT NULL,
+                artifact_data JSON NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (session_id, message_id, artifact_type)
+            )
+        """
+        )
+
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chat_artifacts_created_at ON chat_artifacts(created_at)"
+        )
+
+        logger.info("Created chat_artifacts table with indexes")
+
     def _ensure_file_macros(self) -> None:
         """Ensure file deduplication macros use repository-aware signatures."""
         if not self.conn:
@@ -729,7 +866,7 @@ class DuckDBClient:
         ).fetchall()
 
         current_version = result[-1][0] if result else 0
-        latest_version = 6  # Update when new migrations added
+        latest_version = 7  # Update when new migrations added
 
         return {
             "current_version": current_version,
@@ -1024,6 +1161,109 @@ class DuckDBClient:
                 # Ensure state is reset even if close fails
                 self.conn = None
                 self._initialized = False
+
+    async def store_chat_artifact(
+        self,
+        session_id: str,
+        message_id: str,
+        artifact_type: str,
+        data: Dict[str, Any],
+    ) -> None:
+        """
+        Store a chat artifact (e.g., graph data) for a specific message.
+
+        Uses INSERT OR REPLACE to support idempotent updates.
+
+        Args:
+            session_id: Chat session identifier
+            message_id: Message identifier within the session
+            artifact_type: Type of artifact (e.g., "graph")
+            data: Artifact data as a dictionary (will be JSON-serialized)
+        """
+        import json
+
+        json_data = json.dumps(data)
+        await self.execute_write(
+            """
+            INSERT INTO chat_artifacts
+                (session_id, message_id, artifact_type, artifact_data)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (session_id, message_id, artifact_type)
+            DO UPDATE SET artifact_data = EXCLUDED.artifact_data
+            """,
+            (session_id, message_id, artifact_type, json_data),
+        )
+        logger.debug(
+            "Stored chat artifact: session=%s, message=%s, type=%s",
+            session_id,
+            message_id,
+            artifact_type,
+        )
+
+    def get_chat_artifact(
+        self,
+        session_id: str,
+        message_id: str,
+        artifact_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve a chat artifact for a specific message.
+
+        Args:
+            session_id: Chat session identifier
+            message_id: Message identifier within the session
+            artifact_type: Type of artifact (e.g., "graph")
+
+        Returns:
+            Artifact data as a dictionary, or None if not found
+        """
+        import json
+
+        result = self.fetchone(
+            """
+            SELECT artifact_data
+            FROM chat_artifacts
+            WHERE session_id = ? AND message_id = ? AND artifact_type = ?
+            """,
+            (session_id, message_id, artifact_type),
+        )
+        if result and result[0]:
+            try:
+                return json.loads(result[0])
+            except json.JSONDecodeError:
+                logger.warning(
+                    "Failed to parse chat artifact JSON: session=%s, message=%s",
+                    session_id,
+                    message_id,
+                )
+                return None
+        return None
+
+    async def cleanup_old_chat_artifacts(self, retention_days: int) -> int:
+        """
+        Delete chat artifacts older than the specified retention period.
+
+        Args:
+            retention_days: Number of days to retain artifacts
+
+        Returns:
+            Number of artifacts deleted
+        """
+        result = await self.execute_write(
+            """
+            DELETE FROM chat_artifacts
+            WHERE created_at < CURRENT_TIMESTAMP - INTERVAL ? DAY
+            """,
+            (retention_days,),
+        )
+        deleted_count = result.rowcount if hasattr(result, "rowcount") else 0
+        if deleted_count > 0:
+            logger.info(
+                "Cleaned up %d chat artifacts older than %d days",
+                deleted_count,
+                retention_days,
+            )
+        return deleted_count
 
     @property
     def is_initialized(self) -> bool:

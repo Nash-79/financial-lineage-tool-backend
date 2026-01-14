@@ -5,15 +5,22 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from typing import Any, Dict, Optional
+import uuid
+from typing import Any, Dict, Optional, Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..config import config
 from ..middleware.auth import User, get_current_user
-from ..models.chat import ChatRequest, ChatResponse
+from ..models.chat import (
+    ChatRequest,
+    ChatResponse,
+    ChatGraphArtifactResponse,
+    ChatGraphArtifactNotFoundResponse,
+)
 from src.services.chat_service import AllModelsFailed
+from src.storage.duckdb_client import get_duckdb_client
 from src.utils.audit_logger import get_audit_logger
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -83,6 +90,18 @@ async def _run_chat(
             result.get("response", ""),
         )
 
+    # Generate message_id and persist graph_data if present and session_id is provided
+    message_id = None
+    graph_data = result.get("graph_data")
+    if graph_data and request.session_id and background_tasks:
+        message_id = str(uuid.uuid4())
+        background_tasks.add_task(
+            _persist_graph_artifact,
+            request.session_id,
+            message_id,
+            graph_data,
+        )
+
     return ChatResponse(
         response=result.get("response", ""),
         sources=result.get("sources", []),
@@ -91,8 +110,28 @@ async def _run_chat(
         model=result.get("model"),
         next_actions=result.get("next_actions", []),
         warnings=result.get("warnings", []),
-        graph_data=result.get("graph_data"),
+        graph_data=graph_data,
+        message_id=message_id,
     )
+
+
+async def _persist_graph_artifact(
+    session_id: str,
+    message_id: str,
+    graph_data: Dict[str, Any],
+) -> None:
+    """Persist graph data as a chat artifact in DuckDB."""
+    try:
+        duckdb = get_duckdb_client()
+        await duckdb.store_chat_artifact(
+            session_id=session_id,
+            message_id=message_id,
+            artifact_type="graph",
+            data=graph_data,
+        )
+    except Exception as exc:
+        # Log but don't fail the request - persistence is best-effort
+        print(f"[!] Failed to persist graph artifact: {exc}")
 
 
 @router.post("/deep", response_model=ChatResponse)
@@ -337,3 +376,69 @@ async def delete_session(
         }
 
     return {"status": "ignored", "message": "Memory service not initialized"}
+
+
+@router.get(
+    "/session/{session_id}/message/{message_id}/graph",
+    response_model=ChatGraphArtifactResponse,
+    responses={
+        404: {
+            "model": ChatGraphArtifactNotFoundResponse,
+            "description": "Graph artifact not found for this message",
+        }
+    },
+)
+async def get_message_graph(
+    session_id: str,
+    message_id: str,
+    user: User = Depends(get_current_user),
+) -> Union[ChatGraphArtifactResponse, JSONResponse]:
+    """
+    Retrieve persisted graph data for a specific chat message.
+
+    Returns the lineage graph that was generated with the original chat response.
+    Use this endpoint to revisit answer-specific lineage after the conversation advances.
+    """
+    try:
+        print(f"[DEBUG] Fetching artifact for session={session_id} message={message_id}")
+        duckdb = get_duckdb_client()
+        # Verify duckdb initialization state
+        if not duckdb:
+             raise RuntimeError("DuckDB client not initialized")
+             
+        artifact = await duckdb.get_chat_artifact(
+            session_id=session_id,
+            message_id=message_id,
+            artifact_type="graph",
+        )
+    except RuntimeError as e:
+        # DuckDB not initialized
+        raise HTTPException(
+            status_code=503,
+            detail=f"Storage service error: {str(e)}",
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in get_message_graph: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    if artifact is None:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "error": "Graph artifact not found",
+                "session_id": session_id,
+                "message_id": message_id,
+                "suggestion": "Use the current lineage page for historical analysis",
+            },
+            headers={
+                "Cache-Control": "no-cache",
+            },
+        )
+
+    return ChatGraphArtifactResponse(
+        session_id=session_id,
+        message_id=message_id,
+        nodes=artifact.get("nodes", []),
+        edges=artifact.get("edges", []),
+        metadata=artifact.get("metadata", {}),
+    )

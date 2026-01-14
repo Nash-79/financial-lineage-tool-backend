@@ -172,3 +172,53 @@ The system SHALL persist embedding payloads before upserting into Qdrant.
 - **AND** each record SHALL include the vector payload, metadata payload, and chunk index
 - **AND** artifacts are written before the Qdrant upsert occurs
 
+### Requirement: Preserve relative source paths for ingested files
+The system SHALL persist the original relative path for files ingested via upload and GitHub.
+
+#### Scenario: Folder upload path retention
+- **WHEN** a user uploads a folder with nested files
+- **THEN** the system stores files under `run_dir/raw_source/<relative_path>`
+- **AND** the metadata store records `relative_path` for each file
+- **AND** file listings can reconstruct the folder tree from stored paths
+
+#### Scenario: GitHub path retention
+- **WHEN** GitHub ingestion processes repository files
+- **THEN** the system stores files with their repository-relative path
+- **AND** the metadata store records the original path and source repository
+
+### Requirement: Chat Artifact Persistence
+The system SHALL persist chat response artifacts (graph data) in DuckDB for retrieval.
+
+#### Scenario: Chat artifacts table schema
+- **GIVEN** DuckDB schema is initialized (v7+)
+- **WHEN** the system creates the chat_artifacts table
+- **THEN** the table includes:
+  - `session_id TEXT NOT NULL` - Chat session identifier
+  - `message_id TEXT NOT NULL` - Unique message identifier
+  - `artifact_type TEXT NOT NULL` - Type of artifact (e.g., "graph")
+  - `artifact_data JSON NOT NULL` - Serialized artifact content
+  - `created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP` - Creation time
+- **AND** primary key is `(session_id, message_id, artifact_type)`
+- **AND** index exists on `created_at` for retention cleanup
+
+#### Scenario: Store chat artifact
+- **GIVEN** a chat endpoint generates response with graph_data
+- **WHEN** the system persists the artifact
+- **THEN** it stores the graph_data JSON in chat_artifacts table
+- **AND** uses upsert semantics (ON CONFLICT DO UPDATE)
+- **AND** persistence runs asynchronously via background task
+- **AND** persistence failures are logged but do not block response
+
+#### Scenario: Retrieve chat artifact
+- **GIVEN** a client requests a stored graph artifact
+- **WHEN** the system queries chat_artifacts by session_id and message_id
+- **THEN** it returns the artifact_data as JSON
+- **AND** returns 404 if artifact not found
+
+#### Scenario: Chat artifact retention cleanup
+- **GIVEN** artifacts older than CHAT_ARTIFACT_RETENTION_DAYS exist
+- **WHEN** cleanup runs (scheduled or on-demand)
+- **THEN** the system deletes artifacts where created_at < NOW() - retention_days
+- **AND** default retention is 90 days
+- **AND** retention is configurable via CHAT_ARTIFACT_RETENTION_DAYS environment variable
+

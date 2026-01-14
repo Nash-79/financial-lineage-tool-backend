@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException
 
-from src.llm.free_tier import FREE_TIER_MODELS
 from ..config import config
 from ..models.config import SQLDialect
 
@@ -25,7 +24,7 @@ async def get_config_root() -> Dict[str, Any]:
 
     payload = {
         "chat_endpoint_models": config.get_chat_endpoint_models(),
-        "free_tier_models": sorted(FREE_TIER_MODELS),
+        "free_tier_models": sorted(config.FREE_TIER_MODELS),
     }
     _CONFIG_CACHE["timestamp"] = now
     _CONFIG_CACHE["payload"] = payload

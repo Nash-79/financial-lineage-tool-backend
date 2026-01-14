@@ -6,6 +6,8 @@ import asyncio
 import json
 import logging
 import re
+import os
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -14,6 +16,7 @@ import httpx
 
 from src.api.config import config
 from src.llm.free_tier import DEFAULT_FREE_TIER_MODEL, enforce_free_tier
+from src.storage.duckdb_client import get_duckdb_client
 from src.utils import metrics
 from src.utils.urn import generate_urn, is_valid_urn
 
@@ -130,6 +133,7 @@ class ChatService:
         self.graph = graph
         self.api_key = openrouter_api_key
         self.client = httpx.AsyncClient(timeout=120.0)
+        self._ensure_chat_logger()
 
     async def close(self) -> None:
         """Close the underlying HTTP client."""
@@ -144,32 +148,92 @@ class ChatService:
         memory_context: str = "",
     ) -> Dict[str, Any]:
         endpoint_key = endpoint.lower()
+        start_time = time.monotonic()
+        metrics.counter(
+            "chat_request_count",
+            "Chat requests",
+            {"endpoint": endpoint_key},
+        ).inc()
         project_id, repository_id, project_filter = self._extract_context_ids(context)
 
-        retrieval = await self._build_retrieval_context(
-            endpoint=endpoint_key,
-            query=query,
-            project_id=project_id,
-            project_filter=project_filter,
-            repository_id=repository_id,
-            memory_context=memory_context,
-        )
+        try:
+            retrieval = await self._build_retrieval_context(
+                endpoint=endpoint_key,
+                query=query,
+                project_id=project_id,
+                project_filter=project_filter,
+                repository_id=repository_id,
+                memory_context=memory_context,
+            )
 
-        system_prompt = BASE_SYSTEM_PROMPT + "\n" + ENDPOINT_PROMPTS.get(endpoint_key, "")
-        user_prompt = self._build_user_prompt(query, retrieval["context_text"])
+            # Extract graph data for frontend if available
+            graph_data = None
+            if endpoint_key in {"deep", "graph"} and self.graph:
+                graph_entities = retrieval.get("debug_graph_entities", [])
+                graph_relationships = retrieval.get("debug_graph_relationships", [])
+                
+                if graph_entities or graph_relationships:
+                    nodes = []
+                    for entity in graph_entities:
+                        # Ensure we have a valid ID and label
+                        node_id = entity.get("id")
+                        label = entity.get("entity_type", "Node")
+                        name = entity.get("name", node_id)
+                        if node_id:
+                            nodes.append({
+                                "id": node_id,
+                                "label": label,
+                                "name": name,
+                                "properties": entity
+                            })
+                            
+                    edges = []
+                    for rel in graph_relationships:
+                        # Ensure source/target exist and are strings
+                        source = rel.get("source")
+                        target = rel.get("target")
+                        rel_type = rel.get("relationship", "RELATED")
+                        
+                        if source and target:
+                            edges.append({
+                                "id": f"{source}-{rel_type}-{target}",
+                                "source": source,
+                                "target": target,
+                                "label": rel_type,
+                                "properties": rel
+                            })
+                            
+                    if nodes:
+                        graph_data = {"nodes": nodes, "edges": edges}
+            user_prompt = self._build_user_prompt(query, retrieval["context_text"])
+            system_prompt = BASE_SYSTEM_PROMPT + ENDPOINT_PROMPTS.get(endpoint_key, "")
 
-        temperature = self._temperature_for_endpoint(endpoint_key)
-        timeout = self._timeout_for_endpoint(endpoint_key)
-        models = self._models_for_endpoint(endpoint_key)
+            temperature = self._temperature_for_endpoint(endpoint_key)
+            timeout = self._timeout_for_endpoint(endpoint_key)
+            models = self._models_for_endpoint(endpoint_key)
 
-        parsed, model_used, parse_failed = await self._call_with_fallback(
-            endpoint=endpoint_key,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            temperature=temperature,
-            timeout=timeout,
-            models=models,
-        )
+            parsed, model_used, parse_failed, attempts, raw_response = await self._call_with_fallback(
+                endpoint=endpoint_key,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=temperature,
+                timeout=timeout,
+                models=models,
+            )
+        except Exception as exc:
+            metrics.counter(
+                "chat_request_failure_count",
+                "Chat requests failed",
+                {"endpoint": endpoint_key, "error": exc.__class__.__name__},
+            ).inc()
+            raise
+        finally:
+            elapsed = time.monotonic() - start_time
+            metrics.histogram(
+                "chat_latency_seconds",
+                "Chat request latency in seconds",
+                labels={"endpoint": endpoint_key},
+            ).observe(elapsed)
 
         sources = self._resolve_sources(
             parsed.get("evidence", []), retrieval["evidence"]
@@ -187,13 +251,73 @@ class ChatService:
         if parse_failed and "LLM returned malformed response." not in warnings:
             warnings.append("LLM returned malformed response. Falling back to safe response.")
 
+        primary_model = enforce_free_tier(models[0])[0] if models else DEFAULT_FREE_TIER_MODEL
+        if attempts:
+            if model_used != primary_model:
+                failure_reasons = "; ".join(
+                    f"{attempt.model}: {attempt.error}" for attempt in attempts
+                )
+                warnings.append(
+                    f"Model fallback used. Primary '{primary_model}' failed: {failure_reasons}"
+                )
+            else:
+                failure_reasons = "; ".join(
+                    f"{attempt.model}: {attempt.error}" for attempt in attempts
+                )
+                warnings.append(f"Model retries occurred: {failure_reasons}")
+
+        metrics.counter(
+            "chat_request_success_count",
+            "Chat requests succeeded",
+            {"endpoint": endpoint_key},
+        ).inc()
+
+        formatted_answer = self._format_answer(
+            endpoint=endpoint_key,
+            answer_text=parsed.get("answer", "Unable to generate answer"),
+            sources=sources,
+            warnings=warnings,
+            next_actions=next_actions,
+            parse_failed=parse_failed,
+            raw_candidate=raw_response,
+        )
+
+        self._log_chat_event(
+            endpoint=endpoint_key,
+            query=query,
+            project_id=project_id,
+            model=model_used,
+            attempts=attempts,
+            warnings=warnings,
+            next_actions=next_actions,
+            latency_seconds=elapsed,
+        )
+
+        # Persist graph data if associated with a message
+        session_id = context.get("session_id") if context else None
+        message_id = context.get("message_id") if context else None
+        
+        if graph_data and session_id and message_id:
+            try:
+                # Run storage in background to not block response
+                db = get_duckdb_client()
+                await db.save_chat_artifact(
+                    session_id=session_id,
+                    message_id=message_id,
+                    artifact_type="graph",
+                    content=graph_data
+                )
+            except Exception as e:
+                logger.error(f"Failed to persist chat graph artifact: {e}")
+
         return {
-            "response": parsed.get("answer", "Unable to generate answer"),
+            "response": formatted_answer,
             "sources": sources,
             "next_actions": next_actions,
             "warnings": warnings,
             "model": model_used,
-            "graph_data": None,
+            "graph_data": graph_data,
+            "raw_candidate": raw_response if parse_failed else None,
         }
 
     async def _build_retrieval_context(
@@ -285,7 +409,11 @@ class ChatService:
         return {
             "context_text": (context_text or "").strip(),
             "evidence": evidence,
+            "context_text": (context_text or "").strip(),
+            "evidence": evidence,
             "warnings": warnings,
+            "debug_graph_entities": graph_entities,
+            "debug_graph_relationships": graph_relationships,
         }
 
     async def _fetch_vector_results(
@@ -546,10 +674,11 @@ class ChatService:
         temperature: float,
         timeout: float,
         models: List[str],
-    ) -> Tuple[Dict[str, Any], str, bool]:
+    ) -> Tuple[Dict[str, Any], str, bool, List[ModelAttempt], str]:
         attempts: List[ModelAttempt] = []
         parse_failures = 0
         last_model = models[0] if models else DEFAULT_FREE_TIER_MODEL
+        raw_response = ""
 
         for idx, model in enumerate(models):
             selected_model, downgraded = enforce_free_tier(model)
@@ -571,8 +700,9 @@ class ChatService:
                     user_prompt=user_prompt,
                     temperature=temperature,
                     timeout=timeout,
-                    enforce_json=("deepseek/deepseek-r1" in selected_model),
+                    enforce_json=(selected_model in config.CHAT_JSON_MODELS),
                 )
+                raw_response = response_text
             except httpx.TimeoutException:
                 attempts.append(
                     ModelAttempt(
@@ -668,11 +798,11 @@ class ChatService:
                 continue
 
             parsed = self._fill_missing_fields(parsed)
-            return parsed, selected_model, False
+            return parsed, selected_model, False, attempts, raw_response
 
         if parse_failures > 0:
             fallback = self._safe_fallback(endpoint, last_model)
-            return fallback, last_model, True
+            return fallback, last_model, True, attempts, raw_response
 
         metrics.counter(
             "chat_all_models_failed",
@@ -816,6 +946,180 @@ class ChatService:
         if resolved:
             return resolved
         return retrieved_evidence
+
+    def _format_answer(
+        self,
+        *,
+        endpoint: str,
+        answer_text: str,
+        sources: List[Dict[str, Any]],
+        warnings: List[str],
+        next_actions: List[str],
+        parse_failed: bool,
+        raw_candidate: str,
+    ) -> str:
+        if endpoint == "title":
+            return answer_text.strip()
+
+        summary = self._normalize_summary(answer_text)
+        sections: List[str] = [f"Summary:\n{summary}"]
+
+        nodes: List[str] = []
+        edges: List[str] = []
+        chunks: List[str] = []
+        docs: List[str] = []
+
+        for source in sources:
+            if not isinstance(source, dict):
+                continue
+            source_type = source.get("type")
+            metadata = source.get("metadata") or {}
+            urn = source.get("id", "unknown")
+            note = source.get("note", "")
+
+            if source_type == "graph":
+                rel = metadata.get("relationship")
+                if rel:
+                    src = metadata.get("source", "unknown")
+                    tgt = metadata.get("target", "unknown")
+                    edges.append(f"- {src} -{rel}-> {tgt} ({urn})")
+                else:
+                    label = metadata.get("label", "Node")
+                    name = metadata.get("name", note or "unknown")
+                    nodes.append(f"- {name} ({label}) ({urn})")
+            elif source_type == "chunk":
+                file_path = metadata.get("file_path", "unknown")
+                chunk_type = metadata.get("chunk_type", "chunk")
+                chunks.append(f"- {file_path} ({chunk_type}) ({urn})")
+            elif source_type == "doc":
+                docs.append(f"- {note or urn}")
+
+        evidence_counts = {
+            "nodes": len(nodes),
+            "edges": len(edges),
+            "chunks": len(chunks),
+            "docs": len(docs),
+        }
+        if any(evidence_counts.values()):
+            sections.append(
+                "Evidence Summary:\n"
+                + "\n".join(
+                    [
+                        f"- Graph nodes: {evidence_counts['nodes']}",
+                        f"- Graph edges: {evidence_counts['edges']}",
+                        f"- Vector chunks: {evidence_counts['chunks']}",
+                        f"- Documents: {evidence_counts['docs']}",
+                    ]
+                )
+            )
+
+        if warnings:
+            sections.append("Warnings:\n" + "\n".join(f"- {w}" for w in warnings))
+
+        cleaned_actions = self._normalize_list(next_actions)
+        if cleaned_actions:
+            sections.append(
+                "Next Actions:\n" + "\n".join(f"- {action}" for action in cleaned_actions)
+            )
+            sections.append(
+                "Suggested Prompts:\n"
+                + "\n".join(f"- {self._action_to_prompt(action)}" for action in cleaned_actions)
+            )
+
+        if parse_failed and raw_candidate:
+            sections.append(
+                "Raw Candidate:\n```\n"
+                f"{raw_candidate.strip()}\n"
+                "```"
+            )
+        return "\n\n".join(sections)
+
+    def _normalize_summary(self, answer_text: str) -> str:
+        if not answer_text:
+            return "Unable to generate answer."
+
+        cleaned = answer_text.strip()
+        if cleaned.lower().startswith("summary:"):
+            cleaned = cleaned.split(":", 1)[1].strip()
+
+        split_markers = [
+            "\nGraph Summary:",
+            "\nEvidence:",
+            "\nNext Actions:",
+            "\nWarnings:",
+        ]
+        for marker in split_markers:
+            if marker in cleaned:
+                cleaned = cleaned.split(marker, 1)[0].strip()
+
+        lines = []
+        for line in cleaned.splitlines():
+            if "urn:li:" in line:
+                continue
+            lines.append(line)
+        cleaned = "\n".join(lines).strip()
+
+        return cleaned or "Unable to generate answer."
+
+    def _normalize_list(self, items: List[str]) -> List[str]:
+        cleaned = []
+        seen = set()
+        for item in items:
+            if not item:
+                continue
+            normalized = " ".join(str(item).split())
+            key = normalized.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(normalized)
+        return cleaned
+
+    def _action_to_prompt(self, action: str) -> str:
+        if action.endswith("?"):
+            return action
+        return f"{action}?"
+
+    def _ensure_chat_logger(self) -> None:
+        if getattr(self, "_chat_logger_ready", False):
+            return
+        log_dir = os.path.join(config.LOG_PATH, "chat")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, f"chat_{datetime.utcnow().date().isoformat()}.log")
+        handler = logging.FileHandler(log_path, encoding="utf-8")
+        formatter = logging.Formatter("%(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        self._chat_logger_ready = True
+
+    def _log_chat_event(
+        self,
+        *,
+        endpoint: str,
+        query: str,
+        project_id: str,
+        model: str,
+        attempts: List[ModelAttempt],
+        warnings: List[str],
+        next_actions: List[str],
+        latency_seconds: float,
+    ) -> None:
+        payload = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "endpoint": endpoint,
+            "project_id": project_id,
+            "model": model,
+            "attempts": [
+                {"model": attempt.model, "error": attempt.error, "timestamp": attempt.timestamp}
+                for attempt in attempts
+            ],
+            "warnings": warnings,
+            "next_actions": next_actions,
+            "latency_ms": int(latency_seconds * 1000),
+            "query": query,
+        }
+        logger.info(json.dumps(payload, ensure_ascii=True))
 
     def _has_graph_sources(self, sources: List[Dict[str, Any]]) -> bool:
         return any(source.get("type") == "graph" for source in sources)

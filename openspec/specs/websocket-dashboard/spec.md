@@ -44,7 +44,7 @@ WebSocket messages SHALL follow standardized JSON structure
 #### Scenario: Message type identification
 - **WHEN** backend sends WebSocket message
 - **THEN** message contains "type" field indicating message category
-- **AND** type is one of: connection_ack, stats_update, ingestion_complete, query_complete, error
+- **AND** type is one of: connection_ack, stats_update, ingestion_started, ingestion_progress, ingestion_complete, query_complete, error
 - **AND** frontend can route message based on type field
 
 #### Scenario: Message data payload
@@ -125,4 +125,22 @@ WebSocket endpoint SHALL implement security measures
 - **AND** high-frequency events are throttled
 - **AND** critical events bypass throttling
 - **AND** throttling is logged for monitoring
+
+### Requirement: Dashboard stats reflect live backend state
+The system SHALL compute dashboard stats from live graph and file metadata sources.
+
+#### Scenario: Stats update uses live counts
+- **WHEN** frontend calls `GET /api/v1/stats` or receives a `stats_update` message
+- **THEN** node and file counts reflect current graph and DuckDB metadata
+- **AND** the payload includes `filesProcessed` derived from file metadata
+- **AND** the payload format matches the dashboard UI expectations
+
+### Requirement: Ingestion progress broadcast
+The system SHALL broadcast ingestion_started and ingestion_progress events for both GitHub and file upload ingestion.
+
+#### Scenario: File upload telemetry
+- **WHEN** a file upload ingestion session begins
+- **THEN** backend sends ingestion_started with source="upload" and total file count
+- **AND** backend emits ingestion_progress events as files are parsed/extracted
+- **AND** progress events include current file, status, and errors when present
 

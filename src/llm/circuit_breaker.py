@@ -1,6 +1,6 @@
 """Circuit breaker implementation for rate-limited API providers.
 
-Prevents cascading failures when external providers (Groq, OpenRouter) hit rate limits.
+Prevents cascading failures when external providers hit rate limits.
 Uses three states: closed (normal), open (tripped), half-open (testing recovery).
 """
 
