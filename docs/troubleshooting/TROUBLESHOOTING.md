@@ -94,6 +94,44 @@ taskkill /PID <PID> /F
 python -m uvicorn src.api.main_local:app --host 0.0.0.0 --port 8001
 ```
 
+#### 6. Idempotency Not Clearing Old Chunks
+
+**Symptoms:** Re-ingesting a file shows duplicate or stale results.
+
+**Solution:**
+```bash
+# Verify the file_path matches exactly (case-sensitive)
+# Check Qdrant payloads for the stored file_path
+curl http://localhost:6333/collections/code_chunks/points/scroll -H "Content-Type: application/json" -d "{\"limit\": 1, \"with_payload\": true}"
+```
+- Ensure the ingestion request uses the same `file_path` value each time.
+- Confirm Neo4j nodes include `source_file` matching the ingested path.
+
+#### 7. Plugin Not Loaded
+
+**Symptoms:** Logs show "No lineage plugin registered for extension" or parsing is skipped.
+
+**Solution:**
+```bash
+# Confirm plugin list
+echo %LINEAGE_PLUGINS%
+
+# Check plugin config JSON
+echo %LINEAGE_PLUGIN_CONFIG_JSON%
+```
+- Make sure the class paths are correct.
+- Remove trailing commas from `LINEAGE_PLUGINS`.
+- Validate JSON in `LINEAGE_PLUGIN_CONFIG_JSON`.
+
+#### 8. Tree-sitter Import Errors
+
+**Symptoms:** `ModuleNotFoundError: tree_sitter` or `tree_sitter_python`.
+
+**Solution:**
+```bash
+pip install tree-sitter tree-sitter-python
+```
+
 ### Manual Start (Bypassing Batch Script)
 
 If `start-local.bat` isn't working, try manual startup:

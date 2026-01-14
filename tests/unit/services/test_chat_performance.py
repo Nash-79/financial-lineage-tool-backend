@@ -21,12 +21,14 @@ class TestOllamaEmbeddingCache:
     def ollama_client_with_cache(self, mock_redis):
         """Create OllamaClient with Redis cache."""
         from src.services.ollama_service import OllamaClient
+
         return OllamaClient(host="http://localhost:11434", redis_client=mock_redis)
 
     @pytest.fixture
     def ollama_client_no_cache(self):
         """Create OllamaClient without Redis cache."""
         from src.services.ollama_service import OllamaClient
+
         return OllamaClient(host="http://localhost:11434", redis_client=None)
 
     @pytest.mark.asyncio
@@ -34,7 +36,9 @@ class TestOllamaEmbeddingCache:
         """Test cache key is deterministic for same input."""
         key1 = ollama_client_with_cache._get_cache_key("test text", "nomic-embed-text")
         key2 = ollama_client_with_cache._get_cache_key("test text", "nomic-embed-text")
-        key3 = ollama_client_with_cache._get_cache_key("different text", "nomic-embed-text")
+        key3 = ollama_client_with_cache._get_cache_key(
+            "different text", "nomic-embed-text"
+        )
 
         assert key1 == key2, "Same input should produce same key"
         assert key1 != key3, "Different input should produce different key"
@@ -54,7 +58,7 @@ class TestOllamaEmbeddingCache:
         cached_embedding = [0.1, 0.2, 0.3]
         mock_redis.get = AsyncMock(return_value=json.dumps(cached_embedding))
 
-        with patch.object(ollama_client_with_cache.client, 'post') as mock_post:
+        with patch.object(ollama_client_with_cache.client, "post") as mock_post:
             result = await ollama_client_with_cache.embed("test", "nomic-embed-text")
 
             # Should not call Ollama
@@ -73,7 +77,9 @@ class TestOllamaEmbeddingCache:
         mock_response.status_code = 200
         mock_response.json.return_value = {"embedding": embedding}
 
-        with patch.object(ollama_client_with_cache.client, 'post', return_value=mock_response):
+        with patch.object(
+            ollama_client_with_cache.client, "post", return_value=mock_response
+        ):
             result = await ollama_client_with_cache.embed("test", "nomic-embed-text")
 
             assert result == embedding
@@ -81,7 +87,9 @@ class TestOllamaEmbeddingCache:
             mock_redis.setex.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_cache_fallback_on_redis_error(self, ollama_client_with_cache, mock_redis):
+    async def test_cache_fallback_on_redis_error(
+        self, ollama_client_with_cache, mock_redis
+    ):
         """Test embedding works when Redis fails."""
         mock_redis.get = AsyncMock(side_effect=Exception("Redis connection error"))
         embedding = [0.1, 0.2, 0.3]
@@ -90,7 +98,9 @@ class TestOllamaEmbeddingCache:
         mock_response.status_code = 200
         mock_response.json.return_value = {"embedding": embedding}
 
-        with patch.object(ollama_client_with_cache.client, 'post', return_value=mock_response):
+        with patch.object(
+            ollama_client_with_cache.client, "post", return_value=mock_response
+        ):
             result = await ollama_client_with_cache.embed("test", "nomic-embed-text")
 
             assert result == embedding, "Should fallback to Ollama on cache error"
@@ -104,7 +114,9 @@ class TestOllamaEmbeddingCache:
         mock_response.status_code = 200
         mock_response.json.return_value = {"embedding": embedding}
 
-        with patch.object(ollama_client_no_cache.client, 'post', return_value=mock_response):
+        with patch.object(
+            ollama_client_no_cache.client, "post", return_value=mock_response
+        ):
             result = await ollama_client_no_cache.embed("test", "nomic-embed-text")
 
             assert result == embedding
@@ -136,7 +148,9 @@ class TestBatchGraphQueries:
         from src.knowledge_graph.neo4j_client import Neo4jGraphClient
 
         # Patch the method on a real instance
-        with patch.object(Neo4jGraphClient, '__init__', lambda x, *args, **kwargs: None):
+        with patch.object(
+            Neo4jGraphClient, "__init__", lambda x, *args, **kwargs: None
+        ):
             client = Neo4jGraphClient.__new__(Neo4jGraphClient)
             client._execute_query = MagicMock()
 
@@ -149,11 +163,15 @@ class TestBatchGraphQueries:
         """Test that short words are filtered out."""
         from src.knowledge_graph.neo4j_client import Neo4jGraphClient
 
-        with patch.object(Neo4jGraphClient, '__init__', lambda x, *args, **kwargs: None):
+        with patch.object(
+            Neo4jGraphClient, "__init__", lambda x, *args, **kwargs: None
+        ):
             client = Neo4jGraphClient.__new__(Neo4jGraphClient)
             client._execute_query = MagicMock(return_value=[])
 
-            result = client.find_by_names(["a", "ab", "abc"])  # Only "abc" should pass (len > 2)
+            result = client.find_by_names(
+                ["a", "ab", "abc"]
+            )  # Only "abc" should pass (len > 2)
 
             # Should be called since "abc" is long enough
             client._execute_query.assert_called_once()
@@ -164,14 +182,21 @@ class TestBatchGraphQueries:
         """Test that results are deduplicated by ID."""
         from src.knowledge_graph.neo4j_client import Neo4jGraphClient
 
-        with patch.object(Neo4jGraphClient, '__init__', lambda x, *args, **kwargs: None):
+        with patch.object(
+            Neo4jGraphClient, "__init__", lambda x, *args, **kwargs: None
+        ):
             client = Neo4jGraphClient.__new__(Neo4jGraphClient)
             # Return duplicate records
-            client._execute_query = MagicMock(return_value=[
-                {"n": {"id": "t1", "name": "table1"}, "labels": ["Table"]},
-                {"n": {"id": "t1", "name": "table1"}, "labels": ["Table"]},  # Duplicate
-                {"n": {"id": "t2", "name": "table2"}, "labels": ["Table"]},
-            ])
+            client._execute_query = MagicMock(
+                return_value=[
+                    {"n": {"id": "t1", "name": "table1"}, "labels": ["Table"]},
+                    {
+                        "n": {"id": "t1", "name": "table1"},
+                        "labels": ["Table"],
+                    },  # Duplicate
+                    {"n": {"id": "t2", "name": "table2"}, "labels": ["Table"]},
+                ]
+            )
 
             result = client.find_by_names(["table"])
 
@@ -198,7 +223,7 @@ class TestParallelExecution:
             qdrant=qdrant,
             graph=graph,
             llm_model="test-model",
-            embedding_model="test-embed"
+            embedding_model="test-embed",
         )
         return agent
 
@@ -238,7 +263,9 @@ class TestParallelExecution:
         """Test that exceptions in one search don't break the other."""
         mock_agent.ollama.embed = AsyncMock(side_effect=Exception("Embed failed"))
         mock_agent.qdrant.search = AsyncMock()
-        mock_agent.graph.find_by_names = MagicMock(return_value=[{"id": "t1", "name": "test"}])
+        mock_agent.graph.find_by_names = MagicMock(
+            return_value=[{"id": "t1", "name": "test"}]
+        )
 
         code_results, graph_results = await mock_agent._parallel_search("test")
 

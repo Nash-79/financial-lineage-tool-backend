@@ -97,12 +97,13 @@ class SQLChunker(BaseChunker):
         super().__init__(max_tokens)
         self.dialect = dialect
         self._resolved_dialect = None  # Cached resolved dialect
-    
+
     def _get_resolved_dialect(self) -> str:
         """Get resolved sqlglot dialect, resolving 'auto' to concrete dialect."""
         if self._resolved_dialect is None:
             try:
                 from ..config.sql_dialects import resolve_dialect_for_parsing
+
                 self._resolved_dialect = resolve_dialect_for_parsing(self.dialect)
             except Exception:
                 # Fallback to tsql if resolution fails
@@ -111,14 +112,43 @@ class SQLChunker(BaseChunker):
 
     def chunk(self, content: str, file_path: str) -> list[CodeChunk]:
         """Chunk SQL content preserving semantic boundaries."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         chunks = []
 
         # Try to parse with sqlglot using resolved dialect
         try:
             resolved = self._get_resolved_dialect()
+            logger.info(f"Parsing {file_path} with dialect: {resolved}")
             statements = sqlglot.parse(content, dialect=resolved)
-        except Exception:
+            logger.info(f"Parsed {len(statements)} statements from {file_path}")
+
+            # Heuristic: Check for fragmented parsing (orphaned END statements)
+            # This happens with T-SQL procedures where the body isn't captured in the CREATE node
+            orphaned_end = False
+            for stmt in statements:
+                # Check for standalone END - sqlglot parses this as Command or generic Expression depending on version
+                # exp.End reference caused AttributeError, so we check string representation safely
+                if stmt.key.upper() == "END":
+                    orphaned_end = True
+                    break
+
+                # Check for "GO" command interpreted as statement
+                if isinstance(stmt, exp.Command) and str(stmt.this).upper() == "GO":
+                    orphaned_end = True
+                    break
+
+            if orphaned_end:
+                logger.warning(
+                    f"Detected fragmented parsing (orphaned END or GO) in {file_path}, using fallback"
+                )
+                return self._fallback_chunk(content, file_path)
+
+        except Exception as e:
             # Fallback to statement-level splitting
+            logger.warning(f"SQL parsing failed for {file_path}: {e}, using fallback")
             return self._fallback_chunk(content, file_path)
 
         for stmt in statements:
@@ -133,6 +163,7 @@ class SQLChunker(BaseChunker):
             else:
                 chunks.extend(self._chunk_statement(stmt, file_path))
 
+        logger.info(f"Created {len(chunks)} chunks from {file_path}")
         return chunks
 
     def _chunk_with_ctes(
@@ -223,7 +254,7 @@ class SQLChunker(BaseChunker):
 
         if subqueries:
             for sq in subqueries:
-                sq_sql = sq.sql(dialect=self.dialect)
+                sq_sql = sq.sql(dialect=self._get_resolved_dialect())
                 if self.count_tokens(sq_sql) <= self.max_tokens:
                     chunks.append(
                         self._create_chunk(
@@ -288,33 +319,119 @@ class SQLChunker(BaseChunker):
         return list(set(columns))
 
     def _fallback_chunk(self, content: str, file_path: str) -> list[CodeChunk]:
-        """Fallback chunking by SQL statement boundaries."""
+        """Fallback chunking with domain-aware grouping."""
+        import logging
+        import re
+
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"Using domain-aware fallback chunking for {file_path}")
+
         chunks = []
         resolved = self._get_resolved_dialect()
 
-        # Split on semicolons while handling string literals
-        try:
-            statements = sqlglot.parse(content, dialect=resolved)
-        except Exception:
-            # If parsing fails entirely, create a single generic chunk
-            return [CodeChunk(
-                content=content,
-                chunk_type=ChunkType.GENERIC,
-                file_path=file_path,
-                start_line=0,
-                end_line=0,
-                language="sql",
-                token_count=self.count_tokens(content),
-            )]
+        # Domain-aware regex patterns for different SQL object types
+        # T-SQL uses CREATE OR ALTER; Postgres uses CREATE OR REPLACE
+        patterns = {
+            "TABLE": r"CREATE\s+(?:OR\s+REPLACE\s+|OR\s+ALTER\s+)?(?:TEMP\s+|TEMPORARY\s+)?TABLE",
+            "VIEW": r"CREATE\s+(?:OR\s+REPLACE\s+|OR\s+ALTER\s+)?VIEW",
+            "FUNCTION": r"CREATE\s+(?:OR\s+REPLACE\s+|OR\s+ALTER\s+)?FUNCTION",
+            "PROCEDURE": r"CREATE\s+(?:OR\s+REPLACE\s+|OR\s+ALTER\s+)?(?:PROCEDURE|PROC)",
+            "TRIGGER": r"CREATE\s+(?:OR\s+REPLACE\s+|OR\s+ALTER\s+)?TRIGGER",
+            "INDEX": r"CREATE\s+(?:UNIQUE\s+)?(?:CLUSTERED\s+)?(?:NONCLUSTERED\s+)?INDEX",
+            "SCHEMA": r"CREATE\s+SCHEMA",
+        }
 
+        # Find all SQL objects with their positions
+        objects = []
+        for domain_type, pattern in patterns.items():
+            for match in re.finditer(pattern, content, re.IGNORECASE):
+                objects.append(
+                    {
+                        "type": domain_type,
+                        "start": match.start(),
+                        "line": content[: match.start()].count("\n") + 1,
+                    }
+                )
+
+        # Sort by position
+        objects.sort(key=lambda x: x["start"])
+
+        if not objects:
+            # No objects found, use simple semicolon split
+            logger.info(f"No SQL objects detected, using semicolon split")
+            return self._simple_semicolon_chunk(content, file_path)
+
+        # Extract objects with their full content (up to next object or end)
+        for i, obj in enumerate(objects):
+            start_pos = obj["start"]
+            end_pos = objects[i + 1]["start"] if i + 1 < len(objects) else len(content)
+
+            obj["content"] = content[start_pos:end_pos].strip()
+            obj["tokens"] = self.count_tokens(obj["content"])
+
+        # Group by domain type
+        domain_groups = {}
+        for obj in objects:
+            domain = obj["type"]
+            if domain not in domain_groups:
+                domain_groups[domain] = []
+            domain_groups[domain].append(obj)
+
+        # Create chunks per domain, respecting token limits
+        for domain, domain_objs in domain_groups.items():
+            logger.info(f"  {domain}: {len(domain_objs)} objects")
+
+            current_chunk = ""
+            current_tokens = 0
+            objects_in_chunk = 0
+
+            for obj in domain_objs:
+                obj_content = obj["content"]
+                obj_tokens = obj["tokens"]
+
+                # USER REQUIREMENT: strict "Split by Object"
+                # We disable grouping to ensure each object gets its own chunk/file
+                chunks.append(
+                    CodeChunk(
+                        content=obj_content,
+                        chunk_type=ChunkType.SQL_STATEMENT,
+                        file_path=file_path,
+                        start_line=0,
+                        end_line=0,
+                        language="sql",
+                        tables_referenced=self._extract_tables(obj_content),
+                        columns_referenced=self._extract_columns(obj_content),
+                        token_count=obj_tokens,
+                    )
+                )
+                logger.info(
+                    f"    Created {domain} chunk: 1 object, {obj_tokens} tokens"
+                )
+
+        logger.info(
+            f"Domain-aware chunking created {len(chunks)} chunks from {file_path}"
+        )
+        return chunks
+
+    def _simple_semicolon_chunk(self, content: str, file_path: str) -> list[CodeChunk]:
+        """Simple semicolon-based chunking as last resort."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        chunks = []
+        statements = content.split(";")
         current_chunk = ""
         current_tokens = 0
 
         for stmt in statements:
-            if stmt is None:
+            stmt = stmt.strip()
+            if not stmt:
                 continue
-            stmt_sql = stmt.sql(dialect=resolved)
-            stmt_tokens = self.count_tokens(stmt_sql)
+
+            stmt_with_semicolon = stmt + ";"
+            stmt_tokens = self.count_tokens(stmt_with_semicolon)
 
             if current_tokens + stmt_tokens > self.max_tokens and current_chunk:
                 chunks.append(
@@ -330,10 +447,14 @@ class SQLChunker(BaseChunker):
                         token_count=current_tokens,
                     )
                 )
-                current_chunk = stmt_sql
+                current_chunk = stmt_with_semicolon
                 current_tokens = stmt_tokens
             else:
-                current_chunk += "\n\n" + stmt_sql if current_chunk else stmt_sql
+                current_chunk += (
+                    "\n\n" + stmt_with_semicolon
+                    if current_chunk
+                    else stmt_with_semicolon
+                )
                 current_tokens += stmt_tokens
 
         if current_chunk:
@@ -577,11 +698,12 @@ class SemanticChunker:
     Main chunker that delegates to language-specific chunkers.
     """
 
-    def __init__(self):
+    def __init__(self, dialect: str = "auto"):
         self.chunkers = {
-            "sql": SQLChunker(max_tokens=1500),
+            "sql": SQLChunker(max_tokens=1500, dialect=dialect),
             "python": PythonChunker(max_tokens=1000),
         }
+        self.dialect = dialect
 
     def chunk_file(self, content: str, file_path: str) -> list[CodeChunk]:
         """Chunk a file based on its extension."""

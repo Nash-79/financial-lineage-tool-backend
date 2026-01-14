@@ -400,7 +400,6 @@ else:
 SIMILARITY_TOP_K=3
 
 # Use simpler response mode
-RESPONSE_MODE=compact
 
 # Check Ollama performance
 time ollama run llama3.1:8b "test"
@@ -482,6 +481,6 @@ print(f"Cache hit rate: {metrics['query_cache_hit_rate']:.2%}")
 
 ## Next Steps
 
-- ✅ [Docker Setup](DOCKER_SETUP.md)
+- ✅ [Docker Setup](../setup/DOCKER_SETUP.md)
 - ✅ [API Documentation](http://localhost:8000/docs)
 - ✅ [Architecture Overview](ARCHITECTURE.md)

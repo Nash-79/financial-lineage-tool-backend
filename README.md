@@ -55,7 +55,9 @@ That's it! All services (API, Qdrant, Redis) are now running in Docker.
 - **LLM**: Ollama (llama3.1:8b, nomic-embed-text)
 - **RAG**: LlamaIndex framework
 - **Vector DB**: Qdrant (768-dimensional embeddings)
+- **Hybrid Search**: BM25 + dense fusion (Qdrant sparse vectors)
 - **Graph DB**: Neo4j (Cypher queries)
+- **Parsing**: Plugin-based parsers (sqlglot + tree-sitter)
 - **API**: FastAPI with async/await
 - **Deployment**: Docker Compose
 

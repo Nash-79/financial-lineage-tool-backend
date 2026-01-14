@@ -3,7 +3,6 @@
 import os
 import tempfile
 import unittest
-from pathlib import Path
 
 from src.ingestion.parse_cache import ParseCache
 
@@ -20,13 +19,14 @@ class TestParseCache(unittest.TestCase):
 
         # Create temporary SQL file for testing
         self.test_file = os.path.join(self.temp_dir, "test.sql")
-        with open(self.test_file, 'w') as f:
+        with open(self.test_file, "w") as f:
             f.write("SELECT * FROM test_table;")
 
     def tearDown(self):
         """Clean up test fixtures."""
         # Clean up temporary files
         import shutil
+
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
@@ -60,7 +60,7 @@ class TestParseCache(unittest.TestCase):
         self.assertEqual(result, test_data)
 
         # Modify file content
-        with open(self.test_file, 'w') as f:
+        with open(self.test_file, "w") as f:
             f.write("SELECT * FROM different_table;")
 
         # Should be cache miss now (different hash)
@@ -71,15 +71,14 @@ class TestParseCache(unittest.TestCase):
         """Test LRU eviction when max_entries exceeded."""
         # Create cache with max 3 entries
         cache = ParseCache(
-            cache_path=os.path.join(self.temp_dir, "eviction_test.db"),
-            max_entries=3
+            cache_path=os.path.join(self.temp_dir, "eviction_test.db"), max_entries=3
         )
 
         # Create 5 test files
         files = []
         for i in range(5):
             f = os.path.join(self.temp_dir, f"test_{i}.sql")
-            with open(f, 'w') as file:
+            with open(f, "w") as file:
                 file.write(f"SELECT {i};")
             files.append(f)
 
@@ -89,14 +88,14 @@ class TestParseCache(unittest.TestCase):
 
         # Check stats
         stats = cache.get_stats()
-        self.assertEqual(stats['entry_count'], 3)  # Should have evicted 2
+        self.assertEqual(stats["entry_count"], 3)  # Should have evicted 2
 
     def test_clear_cache(self):
         """Test clearing all cache entries."""
         # Add some entries
         for i in range(3):
             f = os.path.join(self.temp_dir, f"test_{i}.sql")
-            with open(f, 'w') as file:
+            with open(f, "w") as file:
                 file.write(f"SELECT {i};")
             self.cache.set(f, {"id": i})
 
@@ -106,7 +105,7 @@ class TestParseCache(unittest.TestCase):
 
         # Verify cache is empty
         stats = self.cache.get_stats()
-        self.assertEqual(stats['entry_count'], 0)
+        self.assertEqual(stats["entry_count"], 0)
 
     def test_get_stats(self):
         """Test cache statistics."""
@@ -115,11 +114,11 @@ class TestParseCache(unittest.TestCase):
 
         # Get stats
         stats = self.cache.get_stats()
-        self.assertEqual(stats['entry_count'], 1)
-        self.assertEqual(stats['max_entries'], 10)
-        self.assertGreater(stats['cache_size_mb'], 0)
-        self.assertEqual(stats['ttl_days'], 1)
+        self.assertEqual(stats["entry_count"], 1)
+        self.assertEqual(stats["max_entries"], 10)
+        self.assertGreater(stats["cache_size_mb"], 0)
+        self.assertEqual(stats["ttl_days"], 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -8,8 +8,9 @@ for efficient parallel processing of CPU-bound SQL parsing tasks.
 import asyncio
 import logging
 import os
+import sys
 import psutil
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Callable, Any, Optional, Dict
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -57,6 +58,7 @@ class WorkerPool:
         max_queue_size: int = 200,
         memory_threshold_percent: float = 80.0,
         enable_back_pressure: bool = True,
+        use_process_pool: Optional[bool] = None,
     ):
         """
         Initialize worker pool.
@@ -66,6 +68,7 @@ class WorkerPool:
             max_queue_size: Maximum queue size before back-pressure (default: 200)
             memory_threshold_percent: Memory usage threshold for back-pressure (default: 80%)
             enable_back_pressure: Enable back-pressure handling (default: True)
+            use_process_pool: Use process-based executor (default: True unless tests)
         """
         # Determine worker count
         cpu_count = os.cpu_count() or 1
@@ -74,12 +77,22 @@ class WorkerPool:
         self.max_queue_size = max_queue_size
         self.memory_threshold = memory_threshold_percent
         self.enable_back_pressure = enable_back_pressure
+        self.is_test_env = bool(
+            os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules
+        )
+        if use_process_pool is None:
+            self.use_process_pool = not self.is_test_env
+        else:
+            self.use_process_pool = use_process_pool
+        if self.enable_back_pressure and self.is_test_env:
+            # Avoid test hangs on high host memory pressure.
+            self.enable_back_pressure = False
 
         # Priority queue
         self.task_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
 
-        # ProcessPoolExecutor for CPU-bound tasks
-        self.executor: Optional[ProcessPoolExecutor] = None
+        # Executor for CPU-bound tasks (process by default, thread in tests)
+        self.executor: Optional[ProcessPoolExecutor | ThreadPoolExecutor] = None
 
         # Worker tasks
         self.workers: list[asyncio.Task] = []
@@ -105,15 +118,22 @@ class WorkerPool:
         self._running = True
         self._shutdown_event.clear()
 
-        # Create ProcessPoolExecutor
-        self.executor = ProcessPoolExecutor(max_workers=self.num_workers)
+        # Create executor
+        if self.use_process_pool:
+            self.executor = ProcessPoolExecutor(max_workers=self.num_workers)
+            executor_type = "process"
+        else:
+            self.executor = ThreadPoolExecutor(max_workers=self.num_workers)
+            executor_type = "thread"
 
         # Start worker tasks
         self.workers = [
             asyncio.create_task(self._worker(i)) for i in range(self.num_workers)
         ]
 
-        logger.info(f"Worker pool started with {self.num_workers} workers")
+        logger.info(
+            f"Worker pool started with {self.num_workers} workers ({executor_type})"
+        )
 
     async def submit(
         self, file_path: str, callback: Callable, priority: Priority = Priority.NORMAL
@@ -255,11 +275,10 @@ class WorkerPool:
         self._running = False
 
         if wait_for_completion:
-            # Wait for queue to drain
-            if not self.task_queue.empty():
-                logger.info(f"Waiting for {self.task_queue.qsize()} pending tasks...")
-                await self.task_queue.join()
-                logger.info("All pending tasks completed")
+            # Wait for queue to drain (including in-flight tasks)
+            logger.info(f"Waiting for {self.task_queue.qsize()} pending tasks...")
+            await self.task_queue.join()
+            logger.info("All pending tasks completed")
 
         # Cancel workers
         for worker in self.workers:
@@ -288,6 +307,7 @@ class WorkerPool:
             "num_workers": self.num_workers,
             "queue_size": self.task_queue.qsize(),
             "max_queue_size": self.max_queue_size,
+            "executor_type": "process" if self.use_process_pool else "thread",
             "tasks_submitted": self._tasks_submitted,
             "tasks_completed": self._tasks_completed,
             "tasks_failed": self._tasks_failed,

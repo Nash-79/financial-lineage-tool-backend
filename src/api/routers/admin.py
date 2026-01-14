@@ -6,21 +6,34 @@ import asyncio
 import json
 import logging
 import os
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+)
 
 from ..config import config
+from ..middleware.auth import get_current_user
+from ...services.index_manager import IndexManager
 
 if TYPE_CHECKING:
     pass
 
-router = APIRouter(prefix="/api/v1", tags=["admin"])
-admin_router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/api/v1", tags=["admin"], dependencies=[Depends(get_current_user)]
+)
+admin_router = APIRouter(
+    prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_user)]
+)
 
 # Logger for admin operations
 logger = logging.getLogger(__name__)
@@ -92,6 +105,19 @@ async def get_dashboard_stats() -> Dict[str, Any]:
     }
 
 
+@router.get("/index/{collection}/stats")
+async def get_index_stats(
+    collection: str = Path(description="Qdrant collection name"),
+) -> Dict[str, Any]:
+    """Return HNSW and vector stats for a Qdrant collection."""
+    state = get_app_state()
+    if not state.qdrant:
+        raise HTTPException(status_code=503, detail="Qdrant not initialized")
+
+    manager = IndexManager(state.qdrant, collection)
+    return await manager.get_stats()
+
+
 @router.get("/activity/recent")
 async def get_recent_activity() -> List[Dict[str, str]]:
     """Get recent activity items.
@@ -112,78 +138,6 @@ async def get_recent_activity() -> List[Dict[str, str]]:
             "timestamp": datetime.utcnow().isoformat(),
         }
     ]
-
-
-@router.get("/files/recent")
-async def get_recent_files() -> List[Dict[str, str]]:
-    """Get recently processed files.
-
-    Returns:
-        List of recently processed files with metadata.
-
-    Note:
-        Currently returns placeholder data. Full file tracking
-        to be implemented.
-    """
-    # TODO: Implement file tracking
-    return [
-        {
-            "id": "1",
-            "name": "sample_schema.sql",
-            "type": "file",
-            "status": "processed",
-            "updatedAt": datetime.utcnow().isoformat(),
-        }
-    ]
-
-
-@router.get("/files")
-async def get_files() -> List[Dict[str, Any]]:
-    """Get all files.
-
-    Returns:
-        List of all files in storage.
-
-    Note:
-        Currently returns empty list. File listing from storage
-        to be implemented.
-    """
-    # TODO: Implement file listing from storage
-    return []
-
-
-@router.get("/files/stats")
-async def get_file_stats() -> Dict[str, int]:
-    """Get file statistics.
-
-    Returns:
-        Dictionary with file counts by status.
-
-    Note:
-        Currently returns placeholder data. File stats tracking
-        to be implemented.
-    """
-    # TODO: Implement file stats tracking
-    return {"total": 0, "processed": 0, "pending": 0, "errors": 0}
-
-
-@router.get("/files/search")
-async def search_files(
-    q: str = Query(..., description="Search query")
-) -> List[Dict[str, Any]]:
-    """Search files by query.
-
-    Args:
-        q: Search query string.
-
-    Returns:
-        List of files matching the search query.
-
-    Note:
-        Currently returns empty list. File search to be implemented.
-    """
-    # TODO: Implement file search
-    return []
 
 
 @router.get("/endpoints")
@@ -242,20 +196,32 @@ async def list_endpoints(
                 dependant = route.dependant
                 if hasattr(dependant, "query_params"):
                     for param in dependant.query_params:
-                        params.append({
-                            "name": param.name,
-                            "type": str(param.type_annotation) if param.type_annotation else "string",
-                            "required": param.required,
-                            "in": "query",
-                        })
+                        params.append(
+                            {
+                                "name": param.name,
+                                "type": (
+                                    str(param.type_annotation)
+                                    if param.type_annotation
+                                    else "string"
+                                ),
+                                "required": param.required,
+                                "in": "query",
+                            }
+                        )
                 if hasattr(dependant, "path_params"):
                     for param in dependant.path_params:
-                        params.append({
-                            "name": param.name,
-                            "type": str(param.type_annotation) if param.type_annotation else "string",
-                            "required": True,
-                            "in": "path",
-                        })
+                        params.append(
+                            {
+                                "name": param.name,
+                                "type": (
+                                    str(param.type_annotation)
+                                    if param.type_annotation
+                                    else "string"
+                                ),
+                                "required": True,
+                                "in": "path",
+                            }
+                        )
                 endpoint_info["parameters"] = params
 
             endpoints.append(endpoint_info)
@@ -291,13 +257,16 @@ async def restart_container() -> Dict[str, str]:
         ensuring the frontend receives confirmation. The actual restart
         happens via Docker's restart policy.
     """
+
     # Schedule shutdown or reload after response is sent
     async def restart_logic():
         await asyncio.sleep(0.5)  # Give time for response to be sent
-        
+
         # Check if running in Docker
         if os.path.exists("/.dockerenv"):
-            logger.info("Docker environment detected, exiting to trigger restart policy")
+            logger.info(
+                "Docker environment detected, exiting to trigger restart policy"
+            )
             os._exit(0)
         else:
             # Local development: Trigger reload by touching main file
@@ -305,14 +274,18 @@ async def restart_container() -> Dict[str, str]:
                 # Assuming running from project root or src/api
                 reload_file = Path("src/api/main_local.py")
                 if not reload_file.exists():
-                     # Try relative to this file
+                    # Try relative to this file
                     reload_file = Path(__file__).parent.parent / "main_local.py"
-                
+
                 if reload_file.exists():
-                    logger.info(f"Local environment detected, touching {reload_file} to trigger reload")
+                    logger.info(
+                        f"Local environment detected, touching {reload_file} to trigger reload"
+                    )
                     reload_file.touch()
                 else:
-                    logger.warning("Could not find main_local.py to trigger reload, exiting process")
+                    logger.warning(
+                        "Could not find main_local.py to trigger reload, exiting process"
+                    )
                     os._exit(0)
             except Exception as e:
                 logger.error(f"Failed to trigger reload: {e}")
@@ -327,21 +300,20 @@ async def restart_container() -> Dict[str, str]:
 @router.get("/config/websocket")
 async def get_websocket_config() -> Dict[str, str]:
     """Get WebSocket configuration for frontend clients.
-    
+
     Returns the WebSocket URL that frontend should use to connect
     to the dashboard. URL is configurable via WEBSOCKET_URL environment
     variable with default: ws://127.0.0.1:8000/admin/ws/dashboard
-    
+
     Returns:
         Dictionary containing websocket_url.
-    
+
     Example:
         {
             "websocket_url": "ws://127.0.0.1:8000/admin/ws/dashboard"
         }
     """
     return {"websocket_url": config.WEBSOCKET_URL}
-
 
 
 # WebSocket Connection Manager

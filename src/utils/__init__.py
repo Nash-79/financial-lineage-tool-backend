@@ -37,6 +37,11 @@ from .exceptions import (
     VectorStoreError,
 )
 from .logging_config import RequestIDFilter, get_logger, setup_logging
+from .audit_logger import (
+    AuditLogger,
+    AuditEventType,
+    get_audit_logger,
+)
 from .types import (
     ChunkMetadata,
     EmbeddingVector,
@@ -94,6 +99,10 @@ __all__ = [
     "RequestIDFilter",
     "get_logger",
     "setup_logging",
+    # Audit Logging
+    "AuditLogger",
+    "AuditEventType",
+    "get_audit_logger",
     # Types
     "ChunkMetadata",
     "EmbeddingVector",

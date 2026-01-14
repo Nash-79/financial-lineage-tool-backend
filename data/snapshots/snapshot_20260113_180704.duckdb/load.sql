@@ -1,0 +1,9 @@
+COPY projects FROM '/app/data/snapshots/snapshot_20260113_180704.duckdb/projects.csv' (FORMAT 'csv', force_not_null ('name', 'id'), quote '"', delimiter ',', header 1);
+COPY schema_version FROM '/app/data/snapshots/snapshot_20260113_180704.duckdb/schema_version.csv' (FORMAT 'csv', force_not_null 'version', quote '"', delimiter ',', header 1);
+COPY system_logs FROM '/app/data/snapshots/snapshot_20260113_180704.duckdb/system_logs.csv' (FORMAT 'csv', force_not_null ('level', 'source', 'message', 'log_id'), quote '"', delimiter ',', header 1);
+COPY upload_settings FROM '/app/data/snapshots/snapshot_20260113_180704.duckdb/upload_settings.csv' (FORMAT 'csv', force_not_null ('allowed_extensions', 'max_file_size_mb', 'id'), quote '"', delimiter ',', header 1);
+COPY project_links FROM '/app/data/snapshots/snapshot_20260113_180704.duckdb/project_links.csv' (FORMAT 'csv', force_not_null ('source_project_id', 'target_project_id', 'link_type', 'id'), quote '"', delimiter ',', header 1);
+COPY repositories FROM '/app/data/snapshots/snapshot_20260113_180704.duckdb/repositories.csv' (FORMAT 'csv', force_not_null ('project_id', 'name', 'source', 'id'), quote '"', delimiter ',', header 1);
+COPY runs FROM '/app/data/snapshots/snapshot_20260113_180704.duckdb/runs.csv' (FORMAT 'csv', force_not_null ('project_id', 'timestamp', 'sequence', 'action', 'status', 'id'), quote '"', delimiter ',', header 1);
+COPY files FROM '/app/data/snapshots/snapshot_20260113_180704.duckdb/files.csv' (FORMAT 'csv', force_not_null ('id', 'project_id', 'run_id', 'filename', 'file_path', 'file_hash', 'file_size_bytes'), quote '"', delimiter ',', header 1);
+COPY links FROM '/app/data/snapshots/snapshot_20260113_180704.duckdb/links.csv' (FORMAT 'csv', force_not_null ('project_id', 'source_repo_id', 'target_repo_id', 'link_type', 'id'), quote '"', delimiter ',', header 1);

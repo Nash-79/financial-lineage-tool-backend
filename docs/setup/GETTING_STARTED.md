@@ -1,5 +1,8 @@
 # Getting Started
 
+Note: This guide uses the legacy organizer workflow (`data/raw` -> `data/separated_sql`).
+For run-scoped ingestion (projects/runs and ingestion artifacts), see `../ingestion/INGESTION_OVERVIEW.md`.
+
 ## Quick Start
 
 ### 1. Installation
@@ -53,4 +56,4 @@ data/separated_sql/your_database/
 
 - **[Local Setup Guide](LOCAL_SETUP_GUIDE.md)**: Detailed environment setup.
 - **[Docker Services](DOCKER_SERVICES.md)**: Understanding the container stack.
-- **[Architecture](ARCHITECTURE.md)**: System design and components.
+- **[Architecture](../architecture/ARCHITECTURE.md)**: System design and components.

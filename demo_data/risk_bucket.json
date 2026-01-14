@@ -1,0 +1,23 @@
+[
+  {
+    "bucket": "EQUITY_US_LARGE",
+    "asset_class": "EQUITY",
+    "region": "US",
+    "min_notional_usd": 1000000,
+    "max_notional_usd": 1000000000
+  },
+  {
+    "bucket": "EQUITY_NONUS",
+    "asset_class": "EQUITY",
+    "region": "EU",
+    "min_notional_usd": 0,
+    "max_notional_usd": 1000000000
+  },
+  {
+    "bucket": "FIXED_INCOME",
+    "asset_class": "BOND",
+    "region": null,
+    "min_notional_usd": 0,
+    "max_notional_usd": 1000000000
+  }
+]

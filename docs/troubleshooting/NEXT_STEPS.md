@@ -74,9 +74,9 @@ All endpoints are implemented and documented:
 **Status**: 100% Complete
 
 **Available Guides**:
-- ✅ [README.md](README.md) - Quick start
-- ✅ [DOCKER_SETUP.md](docs/DOCKER_SETUP.md) - Complete Docker guide
-- ✅ [LLAMAINDEX_RAG.md](docs/LLAMAINDEX_RAG.md) - RAG pipeline docs
+- ✅ [README.md](../../README.md) - Quick start
+- ✅ [DOCKER_SETUP.md](../setup/DOCKER_SETUP.md) - Complete Docker guide
+- ✅ [LLAMAINDEX_RAG.md](../architecture/LLAMAINDEX_RAG.md) - RAG pipeline docs
 - ✅ [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) - Technical summary
 
 ### 5. Test Suite
@@ -266,7 +266,7 @@ async def restart(api_key: str = Depends(security)):
 **Components**:
 - Structured logging (already using structlog)
 - Prometheus metrics endpoint
-- Grafana dashboards (optional)
+- SigNoz dashboards (optional)
 - Alert configuration
 
 ---
@@ -400,8 +400,8 @@ docker cp <container_id>:/tmp/qdrant-backup.tar.gz ./backups/
 ## 📞 Getting Help
 
 ### Documentation
-- [Docker Setup Guide](docs/DOCKER_SETUP.md)
-- [RAG Pipeline Docs](docs/LLAMAINDEX_RAG.md)
+- [Docker Setup Guide](../setup/DOCKER_SETUP.md)
+- [RAG Pipeline Docs](../architecture/LLAMAINDEX_RAG.md)
 - [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
 
 ### Troubleshooting

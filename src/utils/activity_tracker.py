@@ -189,7 +189,7 @@ class ActivityTracker:
 
             # Update session metrics in Redis
             metrics_key = "activity:session_metrics"
-            
+
             await self.redis_client.set(
                 metrics_key, json.dumps(self.metrics.to_dict()), ex=86400  # 24 hour TTL
             )
@@ -197,6 +197,7 @@ class ActivityTracker:
         except Exception as e:
             # Don't fail the request if tracking fails
             import traceback
+
             traceback.print_exc()
             print(f"[!] Failed to persist activity event: {e}")
 

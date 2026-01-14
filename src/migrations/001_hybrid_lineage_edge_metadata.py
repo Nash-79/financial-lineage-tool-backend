@@ -18,16 +18,16 @@ logger = logging.getLogger(__name__)
 def run_migration(client: Neo4jGraphClient):
     """
     Create indexes for hybrid lineage edge properties.
-    
+
     Note: Neo4j doesn't support direct property indexes on relationships
     in all versions. For relationship property queries, we rely on:
     1. Scanning (acceptable for moderate datasets)
     2. Materialization patterns if performance becomes an issue
-    
+
     This migration documents the schema change for reference.
     """
     logger.info("Running hybrid lineage edge metadata migration")
-    
+
     # Document the new relationship properties in a schema metadata node
     # This helps with discoverability and validation
     schema_query = """
@@ -41,21 +41,21 @@ def run_migration(client: Neo4jGraphClient):
     SET schema.updated_at = datetime()
     RETURN schema
     """
-    
+
     try:
         client._execute_write(schema_query, {})
         logger.info("Schema metadata node created/updated successfully")
     except Exception as e:
         logger.error(f"Failed to create schema metadata: {e}")
         raise
-    
+
     logger.info("Migration completed successfully")
     print("✓ Hybrid lineage edge metadata migration completed")
 
 
 if __name__ == "__main__":
     load_dotenv()
-    
+
     # Initialize Neo4j client
     neo4j_client = Neo4jGraphClient(
         uri=os.getenv("NEO4J_URI"),
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         password=os.getenv("NEO4J_PASSWORD"),
         database=os.getenv("NEO4J_DATABASE", "neo4j"),
     )
-    
+
     try:
         run_migration(neo4j_client)
     finally:

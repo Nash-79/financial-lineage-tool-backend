@@ -16,16 +16,16 @@ logger = logging.getLogger(__name__)
 def run_migration(neo4j_client):
     """
     Backfill legacy edges with default metadata properties.
-    
+
     Sets:
     - source: "parser" (for edges created by deterministic parser)
     - status: "approved" (legacy edges are considered approved)
     - confidence: 1.0 (deterministic edges have full confidence)
-    
+
     Only sets properties where they are currently missing (NULL).
     """
     logger.info("Running migration 003: Backfill Legacy Edge Metadata")
-    
+
     # Query to update all relationships missing hybrid metadata
     # Uses COALESCE to only set if property is NULL
     backfill_query = """
@@ -36,7 +36,7 @@ def run_migration(neo4j_client):
         r.confidence = COALESCE(r.confidence, 1.0)
     RETURN count(r) as updated_count
     """
-    
+
     try:
         result = neo4j_client._execute_write(backfill_query)
         updated_count = result[0]["updated_count"] if result else 0
@@ -50,20 +50,21 @@ def run_migration(neo4j_client):
 if __name__ == "__main__":
     # Standalone execution
     import sys
+
     sys.path.insert(0, ".")
-    
+
     from src.knowledge_graph.neo4j_client import Neo4jGraphClient
     from src.api.config import config
-    
+
     print("[*] Running migration: 003_backfill_edge_metadata")
     print(f"[*] Connecting to Neo4j at {config.NEO4J_URI}...")
-    
+
     client = Neo4jGraphClient(
         uri=config.NEO4J_URI,
         username=config.NEO4J_USERNAME,
-        password=config.NEO4J_PASSWORD
+        password=config.NEO4J_PASSWORD,
     )
-    
+
     try:
         updated = run_migration(client)
         print(f"[+] Migration complete: {updated} edges updated")

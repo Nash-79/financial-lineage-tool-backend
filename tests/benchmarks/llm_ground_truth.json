@@ -1,0 +1,430 @@
+{
+    "metadata": {
+        "version": "1.0",
+        "created": "2026-01-11",
+        "description": "Ground truth Q&A dataset for LLM quality benchmarking on SQL lineage questions",
+        "total_pairs": 20,
+        "categories": [
+            "join_analysis",
+            "schema_lookup",
+            "data_flow",
+            "transformation_logic"
+        ]
+    },
+    "qa_pairs": [
+        {
+            "id": "join_qa_001",
+            "question": "What tables does customer_orders join with?",
+            "ideal_answer": "The customer_orders table joins with customers (on customer_id) and products (on product_id) to create complete order records with customer details and product information.",
+            "required_entities": [
+                "customer_orders",
+                "customers",
+                "products"
+            ],
+            "required_concepts": [
+                "join",
+                "customer_id",
+                "product_id"
+            ],
+            "context_files": [
+                "sql/analytics/order_analytics.sql"
+            ],
+            "category": "join_analysis",
+            "difficulty": "easy"
+        },
+        {
+            "id": "join_qa_002",
+            "question": "Describe the JOIN relationships in the sales fact table query",
+            "ideal_answer": "The sales_fact query performs a multi-way join connecting transactions, customers, products, and stores tables. It joins on transaction_id, customer_id, product_id, and store_id to aggregate sales metrics across all dimensions.",
+            "required_entities": [
+                "sales_fact",
+                "transactions",
+                "customers",
+                "products",
+                "stores"
+            ],
+            "required_concepts": [
+                "multi-way join",
+                "aggregation",
+                "dimensions"
+            ],
+            "context_files": [
+                "sql/etl/sales_aggregation.sql"
+            ],
+            "category": "join_analysis",
+            "difficulty": "medium"
+        },
+        {
+            "id": "join_qa_003",
+            "question": "Which tables have foreign key relationships to the users table?",
+            "ideal_answer": "Tables with foreign keys to users include: orders (user_id), payments (user_id), addresses (user_id), and user_preferences (user_id). These relationships enable querying all user-related data across the schema.",
+            "required_entities": [
+                "users",
+                "orders",
+                "payments",
+                "addresses",
+                "user_preferences"
+            ],
+            "required_concepts": [
+                "foreign key",
+                "relationships"
+            ],
+            "context_files": [
+                "sql/schema/create_users.sql",
+                "sql/schema/create_orders.sql"
+            ],
+            "category": "join_analysis",
+            "difficulty": "medium"
+        },
+        {
+            "id": "join_qa_004",
+            "question": "Explain the LEFT JOINs used in the customer revenue query",
+            "ideal_answer": "The customer revenue query uses LEFT JOINs to include all customers even if they have no orders or payments. This ensures customers with zero revenue are still included in the report with NULL values converted to 0.",
+            "required_entities": [
+                "customers",
+                "orders",
+                "payments"
+            ],
+            "required_concepts": [
+                "LEFT JOIN",
+                "NULL handling",
+                "revenue"
+            ],
+            "context_files": [
+                "sql/analytics/customer_revenue.sql"
+            ],
+            "category": "join_analysis",
+            "difficulty": "hard"
+        },
+        {
+            "id": "join_qa_005",
+            "question": "What join strategy is used for the product catalog denormalization?",
+            "ideal_answer": "The product catalog uses INNER JOINs to combine products, categories, and suppliers into a denormalized view. Only products with valid category and supplier references are included, ensuring referential integrity.",
+            "required_entities": [
+                "products",
+                "categories",
+                "suppliers"
+            ],
+            "required_concepts": [
+                "INNER JOIN",
+                "denormalization",
+                "referential integrity"
+            ],
+            "context_files": [
+                "sql/analytics/product_catalog.sql"
+            ],
+            "category": "join_analysis",
+            "difficulty": "medium"
+        },
+        {
+            "id": "schema_qa_001",
+            "question": "What columns are in the users table?",
+            "ideal_answer": "The users table contains: user_id (PK), email, username, password_hash, first_name, last_name, created_at, updated_at, and is_active. It uses UUID for user_id and includes timestamp fields for audit tracking.",
+            "required_entities": [
+                "users"
+            ],
+            "required_concepts": [
+                "primary key",
+                "UUID",
+                "timestamps"
+            ],
+            "context_files": [
+                "sql/schema/create_users.sql"
+            ],
+            "category": "schema_lookup",
+            "difficulty": "easy"
+        },
+        {
+            "id": "schema_qa_002",
+            "question": "List all tables with email columns",
+            "ideal_answer": "Tables with email columns include users (email), customers (customer_email), contacts (contact_email), and notifications (recipient_email). All use VARCHAR type with unique constraints where applicable.",
+            "required_entities": [
+                "users",
+                "customers",
+                "contacts",
+                "notifications"
+            ],
+            "required_concepts": [
+                "email",
+                "VARCHAR",
+                "unique constraint"
+            ],
+            "context_files": [
+                "sql/schema/create_users.sql",
+                "sql/schema/create_customers.sql"
+            ],
+            "category": "schema_lookup",
+            "difficulty": "easy"
+        },
+        {
+            "id": "schema_qa_003",
+            "question": "What data types are used for monetary amounts?",
+            "ideal_answer": "Monetary amounts use DECIMAL(10,2) for precise currency values. Examples include order_total in orders, amount in payments, and price in products. DECIMAL ensures no floating-point rounding errors.",
+            "required_entities": [
+                "orders",
+                "payments",
+                "products"
+            ],
+            "required_concepts": [
+                "DECIMAL",
+                "currency",
+                "precision"
+            ],
+            "context_files": [
+                "sql/schema/create_orders.sql",
+                "sql/schema/create_payments.sql"
+            ],
+            "category": "schema_lookup",
+            "difficulty": "medium"
+        },
+        {
+            "id": "schema_qa_004",
+            "question": "Which tables have JSON or JSONB columns?",
+            "ideal_answer": "Tables with JSON columns include events (event_data JSONB), user_preferences (settings JSONB), and product_metadata (attributes JSONB). JSONB is used for PostgreSQL to enable efficient indexing and querying.",
+            "required_entities": [
+                "events",
+                "user_preferences",
+                "product_metadata"
+            ],
+            "required_concepts": [
+                "JSONB",
+                "indexing",
+                "PostgreSQL"
+            ],
+            "context_files": [
+                "sql/schema/create_events.sql",
+                "sql/schema/create_metadata.sql"
+            ],
+            "category": "schema_lookup",
+            "difficulty": "medium"
+        },
+        {
+            "id": "schema_qa_005",
+            "question": "Describe the indexing strategy for the orders table",
+            "ideal_answer": "The orders table has indexes on: user_id (foreign key lookup), order_date (time-range queries), status (filtering), and a composite index on (user_id, order_date) for user order history queries.",
+            "required_entities": [
+                "orders"
+            ],
+            "required_concepts": [
+                "indexes",
+                "foreign key",
+                "composite index",
+                "query optimization"
+            ],
+            "context_files": [
+                "sql/schema/create_orders.sql"
+            ],
+            "category": "schema_lookup",
+            "difficulty": "hard"
+        },
+        {
+            "id": "dataflow_qa_001",
+            "question": "What tables are upstream of customer_metrics?",
+            "ideal_answer": "Upstream of customer_metrics are: customers (base data), orders (transaction counts), payments (revenue), and user_events (engagement). These feed into customer_staging before the final metrics aggregation.",
+            "required_entities": [
+                "customer_metrics",
+                "customers",
+                "orders",
+                "payments",
+                "user_events",
+                "customer_staging"
+            ],
+            "required_concepts": [
+                "upstream",
+                "staging",
+                "aggregation"
+            ],
+            "context_files": [
+                "sql/etl/customer_metrics_build.sql"
+            ],
+            "category": "data_flow",
+            "difficulty": "medium"
+        },
+        {
+            "id": "dataflow_qa_002",
+            "question": "Trace the complete pipeline from raw events to dashboard metrics",
+            "ideal_answer": "Events flow: raw_events → events_staging (cleaning, deduplication) → events_processed (aggregation, sessionization) → dashboard_metrics (final rollup). Pipeline runs hourly via cron job.",
+            "required_entities": [
+                "raw_events",
+                "events_staging",
+                "events_processed",
+                "dashboard_metrics"
+            ],
+            "required_concepts": [
+                "pipeline",
+                "ETL",
+                "deduplication",
+                "sessionization"
+            ],
+            "context_files": [
+                "sql/etl/events_pipeline.sql",
+                "sql/staging/events_staging.sql"
+            ],
+            "category": "data_flow",
+            "difficulty": "hard"
+        },
+        {
+            "id": "dataflow_qa_003",
+            "question": "Which downstream tables depend on transactions?",
+            "ideal_answer": "Downstream of transactions are: sales_summary (daily aggregates), revenue_report (monthly rollup), customer_ltv (lifetime value), and fraud_detection (pattern analysis). All update incrementally.",
+            "required_entities": [
+                "transactions",
+                "sales_summary",
+                "revenue_report",
+                "customer_ltv",
+                "fraud_detection"
+            ],
+            "required_concepts": [
+                "downstream",
+                "incremental",
+                "aggregates"
+            ],
+            "context_files": [
+                "sql/analytics/revenue_report.sql",
+                "sql/etl/transaction_summary.sql"
+            ],
+            "category": "data_flow",
+            "difficulty": "medium"
+        },
+        {
+            "id": "dataflow_qa_004",
+            "question": "How does data flow in the dimensional model?",
+            "ideal_answer": "Dimensional model follows star schema: fact_sales (center) connects to dim_customer, dim_product, dim_date, and dim_store (dimensions). ETL loads dimensions first, then facts with foreign keys validated.",
+            "required_entities": [
+                "fact_sales",
+                "dim_customer",
+                "dim_product",
+                "dim_date",
+                "dim_store"
+            ],
+            "required_concepts": [
+                "star schema",
+                "fact table",
+                "dimensions",
+                "foreign key validation"
+            ],
+            "context_files": [
+                "sql/warehouse/star_schema.sql"
+            ],
+            "category": "data_flow",
+            "difficulty": "hard"
+        },
+        {
+            "id": "dataflow_qa_005",
+            "question": "What is the refresh schedule for materialized views?",
+            "ideal_answer": "Materialized views refresh on different schedules: customer_summary (hourly), product_stats (daily at 2 AM), monthly_revenue (first of month). Refreshes use CONCURRENTLY option to avoid locking.",
+            "required_entities": [
+                "customer_summary",
+                "product_stats",
+                "monthly_revenue"
+            ],
+            "required_concepts": [
+                "materialized view",
+                "refresh",
+                "CONCURRENTLY",
+                "locking"
+            ],
+            "context_files": [
+                "sql/views/materialized_views.sql"
+            ],
+            "category": "data_flow",
+            "difficulty": "medium"
+        },
+        {
+            "id": "transform_qa_001",
+            "question": "Explain the window function used for customer ranking",
+            "ideal_answer": "The query uses ROW_NUMBER() OVER (ORDER BY total_revenue DESC) to rank customers by revenue. PARTITION BY region enables separate rankings per region. This creates a top customers by region report.",
+            "required_entities": [
+                "customers"
+            ],
+            "required_concepts": [
+                "ROW_NUMBER",
+                "PARTITION BY",
+                "window function",
+                "ranking"
+            ],
+            "context_files": [
+                "sql/analytics/top_customers.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "medium"
+        },
+        {
+            "id": "transform_qa_002",
+            "question": "How does the running total CTE work?",
+            "ideal_answer": "The running_totals CTE uses SUM(revenue) OVER (ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) to calculate cumulative revenue. This creates a running sum ordered chronologically.",
+            "required_entities": [
+                "revenue"
+            ],
+            "required_concepts": [
+                "CTE",
+                "SUM",
+                "window function",
+                "ROWS BETWEEN",
+                "running total"
+            ],
+            "context_files": [
+                "sql/analytics/running_revenue.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "hard"
+        },
+        {
+            "id": "transform_qa_003",
+            "question": "Describe the CASE statement logic for customer segmentation",
+            "ideal_answer": "Customers are segmented using CASE: WHEN total_orders > 50 THEN 'VIP', WHEN total_orders > 10 THEN 'Regular', ELSE 'Occasional'. This categorizes customers into tiers based on purchase frequency.",
+            "required_entities": [
+                "customers"
+            ],
+            "required_concepts": [
+                "CASE",
+                "segmentation",
+                "categorization"
+            ],
+            "context_files": [
+                "sql/analytics/customer_segments.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "easy"
+        },
+        {
+            "id": "transform_qa_004",
+            "question": "What aggregations are performed in the sales rollup?",
+            "ideal_answer": "Sales rollup performs: SUM(amount) for revenue, COUNT(DISTINCT customer_id) for unique customers, AVG(order_value) for average order, and PERCENTILE_CONT(0.5) for median. Grouped by date and product_category.",
+            "required_entities": [
+                "sales"
+            ],
+            "required_concepts": [
+                "SUM",
+                "COUNT DISTINCT",
+                "AVG",
+                "PERCENTILE_CONT",
+                "GROUP BY"
+            ],
+            "context_files": [
+                "sql/analytics/sales_rollup.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "medium"
+        },
+        {
+            "id": "transform_qa_005",
+            "question": "How are dates handled in the time dimension query?",
+            "ideal_answer": "The date dimension uses DATE_TRUNC('month', order_date) for monthly grouping, EXTRACT(DOW FROM order_date) for day of week, and date_part('quarter', order_date) for quarters. This enables flexible time-based analysis.",
+            "required_entities": [
+                "orders"
+            ],
+            "required_concepts": [
+                "DATE_TRUNC",
+                "EXTRACT",
+                "date_part",
+                "time dimension"
+            ],
+            "context_files": [
+                "sql/etl/date_dimension.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "medium"
+        }
+    ]
+}

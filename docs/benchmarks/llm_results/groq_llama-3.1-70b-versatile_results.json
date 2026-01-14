@@ -1,0 +1,114 @@
+{
+  "model": "llama-3.1-70b-versatile",
+  "provider": "groq",
+  "accuracy": 0.0,
+  "citation_quality": 0.0,
+  "hallucination_rate": 0.0,
+  "completeness": 0.0,
+  "ttft_ms": [],
+  "total_latency_ms": [],
+  "by_category": {},
+  "by_difficulty": {},
+  "failed_questions": [
+    {
+      "id": "join_qa_001",
+      "question": "What tables does customer_orders join with?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "join_qa_002",
+      "question": "Describe the JOIN relationships in the sales fact table query",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "join_qa_003",
+      "question": "Which tables have foreign key relationships to the users table?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "join_qa_004",
+      "question": "Explain the LEFT JOINs used in the customer revenue query",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "join_qa_005",
+      "question": "What join strategy is used for the product catalog denormalization?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "schema_qa_001",
+      "question": "What columns are in the users table?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "schema_qa_002",
+      "question": "List all tables with email columns",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "schema_qa_003",
+      "question": "What data types are used for monetary amounts?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "schema_qa_004",
+      "question": "Which tables have JSON or JSONB columns?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "schema_qa_005",
+      "question": "Describe the indexing strategy for the orders table",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "dataflow_qa_001",
+      "question": "What tables are upstream of customer_metrics?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "dataflow_qa_002",
+      "question": "Trace the complete pipeline from raw events to dashboard metrics",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "dataflow_qa_003",
+      "question": "Which downstream tables depend on transactions?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "dataflow_qa_004",
+      "question": "How does data flow in the dimensional model?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "dataflow_qa_005",
+      "question": "What is the refresh schedule for materialized views?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "transform_qa_001",
+      "question": "Explain the window function used for customer ranking",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "transform_qa_002",
+      "question": "How does the running total CTE work?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "transform_qa_003",
+      "question": "Describe the CASE statement logic for customer segmentation",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "transform_qa_004",
+      "question": "What aggregations are performed in the sales rollup?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    },
+    {
+      "id": "transform_qa_005",
+      "question": "How are dates handled in the time dimension query?",
+      "error": "LLM generation failed (groq:llama-3.1-70b-versatile): Client error '400 Bad Request' for url 'https://api.groq.com/openai/v1/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    }
+  ]
+}

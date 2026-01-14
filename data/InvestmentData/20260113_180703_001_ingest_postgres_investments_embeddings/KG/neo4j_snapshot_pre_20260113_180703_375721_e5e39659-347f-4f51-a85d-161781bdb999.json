@@ -1,0 +1,19 @@
+{
+  "metadata": {
+    "phase": "pre",
+    "project_name": "InvestmentData",
+    "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+    "ingestion_id": "e5e39659-347f-4f51-a85d-161781bdb999",
+    "run_id": "8695ba9f-5e40-40b2-b953-54965b0b810d",
+    "file_paths": [
+      "demo_data/postgres_investments_embeddings.sql"
+    ],
+    "timestamp": "2026-01-13T18:07:03.422386",
+    "node_count": 0,
+    "edge_count": 0,
+    "node_label_counts": {},
+    "relationship_type_counts": {}
+  },
+  "nodes": [],
+  "edges": []
+}

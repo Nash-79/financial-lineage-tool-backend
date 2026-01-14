@@ -5,7 +5,7 @@ This module provides utilities to build the <project_context> block
 that gets prepended to LLM prompts during entity extraction.
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional
 from src.storage.metadata_store import ProjectStore
 
 

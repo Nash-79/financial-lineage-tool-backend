@@ -1,0 +1,2031 @@
+{
+  "metadata": {
+    "project_name": "Default Project",
+    "project_id": "default",
+    "ingestion_id": "453cf725-537a-42b4-a7bd-f45d9cdd3d41",
+    "run_id": "79949f27-7b08-4c6e-8a76-e176ed20ac81",
+    "timestamp": "2026-01-13T12:54:48.466172",
+    "node_count": 73,
+    "edge_count": 99,
+    "node_label_counts": {
+      "Table": 13,
+      "Column": 35,
+      "added_repr": 1,
+      "Project": 1,
+      "SchemaMetadata": 1,
+      "Function": 3,
+      "Module": 4,
+      "DataAsset": 4,
+      "File": 1,
+      "FunctionOrProcedure": 10
+    },
+    "relationship_type_counts": {
+      "CONTAINS": 35,
+      "BELONGS_TO": 46,
+      "DERIVES_FROM": 1,
+      "REFERENCES": 6,
+      "DEFINES": 3,
+      "IMPORTS": 4,
+      "READS_FROM": 4
+    }
+  },
+  "nodes": [
+    {
+      "id": "test_table_customers",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "schema": "public",
+        "database": "production",
+        "project_id": "default_project",
+        "name": "customers",
+        "id": "test_table_customers"
+      }
+    },
+    {
+      "id": "test_table_orders",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "schema": "public",
+        "database": "production",
+        "project_id": "default_project",
+        "name": "orders",
+        "id": "test_table_orders"
+      }
+    },
+    {
+      "id": "test_column_customer_id",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "project_id": "default_project",
+        "name": "customer_id",
+        "data_type": "INTEGER",
+        "id": "test_column_customer_id"
+      }
+    },
+    {
+      "id": "saleslt_customer",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "schema": "SalesLT",
+        "database": "AdventureWorksLT",
+        "project_id": "default_project",
+        "name": "SalesLT.Customer",
+        "description": "Customer information",
+        "id": "saleslt_customer",
+        "source_file": "/app/data/test_simple.sql"
+      }
+    },
+    {
+      "id": "saleslt_product",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "schema": "SalesLT",
+        "database": "AdventureWorksLT",
+        "project_id": "default_project",
+        "name": "Product",
+        "description": "Product catalog",
+        "id": "saleslt_product"
+      }
+    },
+    {
+      "id": "saleslt_productcategory",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "schema": "SalesLT",
+        "database": "AdventureWorksLT",
+        "project_id": "default_project",
+        "name": "ProductCategory",
+        "description": "Product categories",
+        "id": "saleslt_productcategory"
+      }
+    },
+    {
+      "id": "saleslt_salesorderheader",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "schema": "SalesLT",
+        "database": "AdventureWorksLT",
+        "project_id": "default_project",
+        "name": "SalesLT.SalesOrderHeader",
+        "description": "Sales order headers",
+        "id": "saleslt_salesorderheader",
+        "source_file": "/app/data/test_simple.sql"
+      }
+    },
+    {
+      "id": "saleslt_salesorderdetail",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "schema": "SalesLT",
+        "database": "AdventureWorksLT",
+        "project_id": "default_project",
+        "name": "SalesOrderDetail",
+        "description": "Sales order line items",
+        "id": "saleslt_salesorderdetail"
+      }
+    },
+    {
+      "id": "saleslt_address",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "schema": "SalesLT",
+        "database": "AdventureWorksLT",
+        "project_id": "default_project",
+        "name": "Address",
+        "description": "Customer addresses",
+        "id": "saleslt_address"
+      }
+    },
+    {
+      "id": "saleslt_customeraddress",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "schema": "SalesLT",
+        "database": "AdventureWorksLT",
+        "project_id": "default_project",
+        "name": "CustomerAddress",
+        "description": "Customer-Address junction table",
+        "id": "saleslt_customeraddress"
+      }
+    },
+    {
+      "id": "saleslt_customer_customerid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": true,
+        "project_id": "default_project",
+        "name": "CustomerID",
+        "data_type": "INT",
+        "id": "saleslt_customer_customerid",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_customer_firstname",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "FirstName",
+        "data_type": "NVARCHAR(50)",
+        "id": "saleslt_customer_firstname",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_customer_lastname",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "LastName",
+        "data_type": "NVARCHAR(50)",
+        "id": "saleslt_customer_lastname",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_customer_emailaddress",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "EmailAddress",
+        "data_type": "NVARCHAR(50)",
+        "id": "saleslt_customer_emailaddress",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_customer_companyname",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "CompanyName",
+        "data_type": "NVARCHAR(128)",
+        "id": "saleslt_customer_companyname",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_product_productid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": true,
+        "project_id": "default_project",
+        "name": "ProductID",
+        "data_type": "INT",
+        "id": "saleslt_product_productid",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_product_name",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "Name",
+        "data_type": "NVARCHAR(50)",
+        "id": "saleslt_product_name",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_product_productnumber",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "ProductNumber",
+        "data_type": "NVARCHAR(25)",
+        "id": "saleslt_product_productnumber",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_product_color",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "Color",
+        "data_type": "NVARCHAR(15)",
+        "id": "saleslt_product_color",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_product_standardcost",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "StandardCost",
+        "data_type": "MONEY",
+        "id": "saleslt_product_standardcost",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_product_listprice",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "ListPrice",
+        "data_type": "MONEY",
+        "id": "saleslt_product_listprice",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_product_productcategoryid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "ProductCategoryID",
+        "data_type": "INT",
+        "id": "saleslt_product_productcategoryid",
+        "is_foreign_key": true
+      }
+    },
+    {
+      "id": "saleslt_productcategory_productcategoryid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": true,
+        "project_id": "default_project",
+        "name": "ProductCategoryID",
+        "data_type": "INT",
+        "id": "saleslt_productcategory_productcategoryid",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_productcategory_name",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "Name",
+        "data_type": "NVARCHAR(50)",
+        "id": "saleslt_productcategory_name",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_productcategory_parentproductcategoryid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "ParentProductCategoryID",
+        "data_type": "INT",
+        "id": "saleslt_productcategory_parentproductcategoryid",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_salesorderheader_salesorderid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": true,
+        "project_id": "default_project",
+        "name": "SalesOrderID",
+        "data_type": "INT",
+        "id": "saleslt_salesorderheader_salesorderid",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_salesorderheader_orderdate",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "OrderDate",
+        "data_type": "DATETIME",
+        "id": "saleslt_salesorderheader_orderdate",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_salesorderheader_customerid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "CustomerID",
+        "data_type": "INT",
+        "id": "saleslt_salesorderheader_customerid",
+        "is_foreign_key": true
+      }
+    },
+    {
+      "id": "saleslt_salesorderheader_subtotal",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "SubTotal",
+        "data_type": "MONEY",
+        "id": "saleslt_salesorderheader_subtotal",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_salesorderheader_totaldue",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "TotalDue",
+        "data_type": "MONEY",
+        "id": "saleslt_salesorderheader_totaldue",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_salesorderdetail_salesorderdetailid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": true,
+        "project_id": "default_project",
+        "name": "SalesOrderDetailID",
+        "data_type": "INT",
+        "id": "saleslt_salesorderdetail_salesorderdetailid",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_salesorderdetail_salesorderid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "SalesOrderID",
+        "data_type": "INT",
+        "id": "saleslt_salesorderdetail_salesorderid",
+        "is_foreign_key": true
+      }
+    },
+    {
+      "id": "saleslt_salesorderdetail_productid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "ProductID",
+        "data_type": "INT",
+        "id": "saleslt_salesorderdetail_productid",
+        "is_foreign_key": true
+      }
+    },
+    {
+      "id": "saleslt_salesorderdetail_orderqty",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "OrderQty",
+        "data_type": "SMALLINT",
+        "id": "saleslt_salesorderdetail_orderqty",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_salesorderdetail_unitprice",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "UnitPrice",
+        "data_type": "MONEY",
+        "id": "saleslt_salesorderdetail_unitprice",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_salesorderdetail_linetotal",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "LineTotal",
+        "data_type": "MONEY",
+        "id": "saleslt_salesorderdetail_linetotal",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_address_addressid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": true,
+        "project_id": "default_project",
+        "name": "AddressID",
+        "data_type": "INT",
+        "id": "saleslt_address_addressid",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_address_addressline1",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "AddressLine1",
+        "data_type": "NVARCHAR(60)",
+        "id": "saleslt_address_addressline1",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_address_city",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "City",
+        "data_type": "NVARCHAR(30)",
+        "id": "saleslt_address_city",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_address_stateprovince",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "StateProvince",
+        "data_type": "NVARCHAR(50)",
+        "id": "saleslt_address_stateprovince",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_address_countryregion",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "CountryRegion",
+        "data_type": "NVARCHAR(50)",
+        "id": "saleslt_address_countryregion",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "saleslt_customeraddress_customerid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "CustomerID",
+        "data_type": "INT",
+        "id": "saleslt_customeraddress_customerid",
+        "is_foreign_key": true
+      }
+    },
+    {
+      "id": "saleslt_customeraddress_addressid",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "AddressID",
+        "data_type": "INT",
+        "id": "saleslt_customeraddress_addressid",
+        "is_foreign_key": true
+      }
+    },
+    {
+      "id": "saleslt_customeraddress_addresstype",
+      "labels": [
+        "Column"
+      ],
+      "properties": {
+        "is_primary_key": false,
+        "project_id": "default_project",
+        "name": "AddressType",
+        "data_type": "NVARCHAR(50)",
+        "id": "saleslt_customeraddress_addresstype",
+        "is_foreign_key": false
+      }
+    },
+    {
+      "id": "customer_orders",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "project_id": "default_project",
+        "name": "customer_orders",
+        "id": "customer_orders",
+        "source_file": "/app/data/test_simple.sql"
+      }
+    },
+    {
+      "id": "û",
+      "labels": [
+        "added_repr"
+      ],
+      "properties": {
+        "project_id": "default_project",
+        "name": "",
+        "id": "û"
+      }
+    },
+    {
+      "id": "default_project",
+      "labels": [
+        "Project"
+      ],
+      "properties": {
+        "name": "Default Project",
+        "id": "default_project"
+      }
+    },
+    {
+      "id": null,
+      "labels": [
+        "SchemaMetadata"
+      ],
+      "properties": {
+        "updated_at": "2026-01-07T19:21:10.330000000+00:00",
+        "edge_properties": [
+          "source",
+          "confidence",
+          "status",
+          "evidence"
+        ],
+        "version": "hybrid_lineage_v1"
+      }
+    },
+    {
+      "id": "60b90e36e9479a3f973deb81578ace33fadae71a82e51ef94f18b45635a34e87",
+      "labels": [
+        "Function"
+      ],
+      "properties": {
+        "args": "[\"config_path\"]",
+        "docstring": "",
+        "name": "load_risk_buckets",
+        "id": "60b90e36e9479a3f973deb81578ace33fadae71a82e51ef94f18b45635a34e87"
+      }
+    },
+    {
+      "id": "2364cab3bc4b5f220ad492f95bf092bf043cd5500401426022c860d4f05edf3c",
+      "labels": [
+        "Function"
+      ],
+      "properties": {
+        "args": "[\"row\", \"rules\"]",
+        "docstring": "Simple rule engine: return first matching bucket based on\nasset_class, region, and notional_usd range.",
+        "name": "classify_risk",
+        "id": "2364cab3bc4b5f220ad492f95bf092bf043cd5500401426022c860d4f05edf3c"
+      }
+    },
+    {
+      "id": "121360f326f50a6cd8be5c5d6854419dc82a34e05f8a7341dbfce73538b9e12d",
+      "labels": [
+        "Function"
+      ],
+      "properties": {
+        "args": "[\"valuation_date\", \"risk_config_path\"]",
+        "docstring": "",
+        "name": "main",
+        "id": "121360f326f50a6cd8be5c5d6854419dc82a34e05f8a7341dbfce73538b9e12d"
+      }
+    },
+    {
+      "id": "087ab1cc61d074e0bdea2661f326804ffc4327a39b1948054a98da0c1e60314f",
+      "labels": [
+        "Module"
+      ],
+      "properties": {
+        "name": "json",
+        "id": "087ab1cc61d074e0bdea2661f326804ffc4327a39b1948054a98da0c1e60314f"
+      }
+    },
+    {
+      "id": "b01d31f7a4f8d6934b2821c3aace23fc389752d14702eebb7fc27737d551204e",
+      "labels": [
+        "Module"
+      ],
+      "properties": {
+        "name": "datetime.date",
+        "id": "b01d31f7a4f8d6934b2821c3aace23fc389752d14702eebb7fc27737d551204e"
+      }
+    },
+    {
+      "id": "bb070e6cd18a81becb03607a13bfa0ff8c7a5385ac6f0cd141adc186844de388",
+      "labels": [
+        "Module"
+      ],
+      "properties": {
+        "name": "psycopg2",
+        "id": "bb070e6cd18a81becb03607a13bfa0ff8c7a5385ac6f0cd141adc186844de388"
+      }
+    },
+    {
+      "id": "54676b55140c909050a372f1f8a12107fcd5ac3a4cb0e15b9ca3050ad03ba1a3",
+      "labels": [
+        "Module"
+      ],
+      "properties": {
+        "name": "pyodbc",
+        "id": "54676b55140c909050a372f1f8a12107fcd5ac3a4cb0e15b9ca3050ad03ba1a3"
+      }
+    },
+    {
+      "id": "1f4eff4ff0aa23b5cbdf311221c3211e446e0c3af772d61c7bcaa9eaac255cac",
+      "labels": [
+        "DataAsset"
+      ],
+      "properties": {
+        "name": "core.Stg_PositionImport",
+        "id": "1f4eff4ff0aa23b5cbdf311221c3211e446e0c3af772d61c7bcaa9eaac255cac"
+      }
+    },
+    {
+      "id": "d9fef5c4d9fee43be3463b99fca51979290a25f70149117e1a7d567eabc5db71",
+      "labels": [
+        "DataAsset"
+      ],
+      "properties": {
+        "name": "export.daily_positions",
+        "id": "d9fef5c4d9fee43be3463b99fca51979290a25f70149117e1a7d567eabc5db71"
+      }
+    },
+    {
+      "id": "6928deb879b50ef700484b6d4b399af9a125bb33c58c2afac57a5106407d6215",
+      "labels": [
+        "DataAsset"
+      ],
+      "properties": {
+        "name": "Postgres",
+        "id": "6928deb879b50ef700484b6d4b399af9a125bb33c58c2afac57a5106407d6215"
+      }
+    },
+    {
+      "id": "2763a0e8184f17bcf12de1fd1be3f8653c637bc28b71723aafdd247049b67d1a",
+      "labels": [
+        "DataAsset"
+      ],
+      "properties": {
+        "name": "datetime",
+        "id": "2763a0e8184f17bcf12de1fd1be3f8653c637bc28b71723aafdd247049b67d1a"
+      }
+    },
+    {
+      "id": "25ca4be3315de1e411024dc427887b540cc4eac9b4c4b62b3f192781b765d64c",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "core",
+        "repository_id": "SQL Server Warehouse",
+        "id": "25ca4be3315de1e411024dc427887b540cc4eac9b4c4b62b3f192781b765d64c",
+        "source": "upload",
+        "source_file": "sql_Investments_objects.sql"
+      }
+    },
+    {
+      "id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "labels": [
+        "File"
+      ],
+      "properties": {
+        "path": "C:\\repos\\financial-lineage-tool-backend\\demo_data\\etl_postgre_to_sql.py",
+        "extension": ".py",
+        "name": "etl_postgre_to_sql.py",
+        "id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e"
+      }
+    },
+    {
+      "id": "urn:li:Table:investmentdata-test-8002:raw_market.trade_feed_venue_a",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "project_id": "investmentdata-test-8002",
+        "subtype": "Table",
+        "name": "raw_market.trade_feed_venue_a",
+        "repository_id": "69528452-6958-474f-acab-4e401c25e271",
+        "id": "urn:li:Table:investmentdata-test-8002:raw_market.trade_feed_venue_a",
+        "source": "upload",
+        "source_file": "postgres_investments.sql"
+      }
+    },
+    {
+      "id": "1f4eff4ff0aa23b5cbdf311221c3211e446e0c3af772d61c7bcaa9eaac255cac",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "core.Stg_PositionImport",
+        "repository_id": "SQL Server Warehouse",
+        "id": "1f4eff4ff0aa23b5cbdf311221c3211e446e0c3af772d61c7bcaa9eaac255cac",
+        "source_file": "sql_Investments_objects.sql"
+      }
+    },
+    {
+      "id": "bdbeb98340c2abc843d66b5ad99384a35462d0c24f87e428410518d17ed87dbb",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "core.usp_UpsertDimInstrument",
+        "repository_id": "SQL Server Warehouse",
+        "id": "bdbeb98340c2abc843d66b5ad99384a35462d0c24f87e428410518d17ed87dbb",
+        "source_file": "sql_Investments_objects.sql"
+      }
+    },
+    {
+      "id": "76742f33ec9567c14fac41454a33622a606cf56a1752592de08bd37d13e951e3",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "core.usp_LoadFactDailyPnL",
+        "repository_id": "SQL Server Warehouse",
+        "id": "76742f33ec9567c14fac41454a33622a606cf56a1752592de08bd37d13e951e3",
+        "source_file": "sql_Investments_objects.sql"
+      }
+    },
+    {
+      "id": "6ce5ac2124000a2d6aa21ea8a0b43fbe1314d29152cde39cbae28ea947bf6d66",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "core.fn_CalcPnL",
+        "repository_id": "SQL Server Warehouse",
+        "id": "6ce5ac2124000a2d6aa21ea8a0b43fbe1314d29152cde39cbae28ea947bf6d66",
+        "source_file": "sql_Investments_objects.sql"
+      }
+    },
+    {
+      "id": "d0054f7ac40868d61c0a18add2bb713d606436e558ae1f60dfd557cb2ecaa9ba",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "core.usp_RunPositionLoad",
+        "repository_id": "SQL Server Warehouse",
+        "id": "d0054f7ac40868d61c0a18add2bb713d606436e558ae1f60dfd557cb2ecaa9ba",
+        "source_file": "sql_Investments_objects.sql"
+      }
+    },
+    {
+      "id": "1e254c0dc6a82ef61f6b1a9e2cae164bd7d43f61454c4f0ecc3b29051fdd4382",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "core.usp_UpsertDimAccount",
+        "repository_id": "SQL Server Warehouse",
+        "id": "1e254c0dc6a82ef61f6b1a9e2cae164bd7d43f61454c4f0ecc3b29051fdd4382",
+        "source_file": "sql_Investments_objects.sql"
+      }
+    },
+    {
+      "id": "331280f7a6b2b59c9a8dee51a7b5963f3ad6a71c08547bd1af142440d6c04d01",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "core.usp_LoadFactPosition",
+        "repository_id": "SQL Server Warehouse",
+        "id": "331280f7a6b2b59c9a8dee51a7b5963f3ad6a71c08547bd1af142440d6c04d01",
+        "source_file": "sql_Investments_objects.sql"
+      }
+    },
+    {
+      "id": "urn:li:FunctionOrProcedure:investmentdata-test-8002:stg_investments.normalize_trade",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "project_id": "investmentdata-test-8002",
+        "subtype": "FunctionOrProcedure",
+        "name": "stg_investments.normalize_trade",
+        "repository_id": "69528452-6958-474f-acab-4e401c25e271",
+        "id": "urn:li:FunctionOrProcedure:investmentdata-test-8002:stg_investments.normalize_trade",
+        "source": "upload",
+        "source_file": "postgres_investments.sql"
+      }
+    },
+    {
+      "id": "urn:li:FunctionOrProcedure:investmentdata-test-8002:stg_investments.trg_position_intraday_audit_fn",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "project_id": "investmentdata-test-8002",
+        "subtype": "FunctionOrProcedure",
+        "name": "stg_investments.trg_position_intraday_audit_fn",
+        "repository_id": "69528452-6958-474f-acab-4e401c25e271",
+        "id": "urn:li:FunctionOrProcedure:investmentdata-test-8002:stg_investments.trg_position_intraday_audit_fn",
+        "source": "upload",
+        "source_file": "postgres_investments.sql"
+      }
+    },
+    {
+      "id": "urn:li:FunctionOrProcedure:investmentdata-test-8002:stg_investments.to_usd",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "project_id": "investmentdata-test-8002",
+        "subtype": "FunctionOrProcedure",
+        "name": "stg_investments.to_usd",
+        "repository_id": "69528452-6958-474f-acab-4e401c25e271",
+        "id": "urn:li:FunctionOrProcedure:investmentdata-test-8002:stg_investments.to_usd",
+        "source": "upload",
+        "source_file": "postgres_investments.sql"
+      }
+    },
+    {
+      "id": "urn:li:FunctionOrProcedure:investmentdata-test-8002:stg_investments.load_instrument_dim_from_json",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "project_id": "investmentdata-test-8002",
+        "subtype": "FunctionOrProcedure",
+        "name": "stg_investments.load_instrument_dim_from_json",
+        "repository_id": "69528452-6958-474f-acab-4e401c25e271",
+        "id": "urn:li:FunctionOrProcedure:investmentdata-test-8002:stg_investments.load_instrument_dim_from_json",
+        "source": "upload",
+        "source_file": "postgres_investments.sql"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source_id": "test_table_customers",
+      "target_id": "test_column_customer_id",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "position": 1,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "test_table_customers",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "test_table_orders",
+      "target_id": "test_table_customers",
+      "type": "DERIVES_FROM",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "transformation": "JOIN ON customer_id",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "test_table_orders",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "test_column_customer_id",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer",
+      "target_id": "saleslt_customer_customerid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer",
+      "target_id": "saleslt_customer_firstname",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer",
+      "target_id": "saleslt_customer_lastname",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer",
+      "target_id": "saleslt_customer_emailaddress",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer",
+      "target_id": "saleslt_customer_companyname",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product",
+      "target_id": "saleslt_product_productid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product",
+      "target_id": "saleslt_product_name",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product",
+      "target_id": "saleslt_product_productnumber",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product",
+      "target_id": "saleslt_product_color",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product",
+      "target_id": "saleslt_product_standardcost",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product",
+      "target_id": "saleslt_product_listprice",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product",
+      "target_id": "saleslt_product_productcategoryid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_productcategory",
+      "target_id": "saleslt_productcategory_productcategoryid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_productcategory",
+      "target_id": "saleslt_productcategory_name",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_productcategory",
+      "target_id": "saleslt_productcategory_parentproductcategoryid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_productcategory",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader",
+      "target_id": "saleslt_salesorderheader_salesorderid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader",
+      "target_id": "saleslt_salesorderheader_orderdate",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader",
+      "target_id": "saleslt_salesorderheader_customerid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader",
+      "target_id": "saleslt_salesorderheader_subtotal",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader",
+      "target_id": "saleslt_salesorderheader_totaldue",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail",
+      "target_id": "saleslt_salesorderdetail_salesorderdetailid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail",
+      "target_id": "saleslt_salesorderdetail_salesorderid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail",
+      "target_id": "saleslt_salesorderdetail_productid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail",
+      "target_id": "saleslt_salesorderdetail_orderqty",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail",
+      "target_id": "saleslt_salesorderdetail_unitprice",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail",
+      "target_id": "saleslt_salesorderdetail_linetotal",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address",
+      "target_id": "saleslt_address_addressid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address",
+      "target_id": "saleslt_address_addressline1",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address",
+      "target_id": "saleslt_address_city",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address",
+      "target_id": "saleslt_address_stateprovince",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address",
+      "target_id": "saleslt_address_countryregion",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customeraddress",
+      "target_id": "saleslt_customeraddress_customerid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customeraddress",
+      "target_id": "saleslt_customeraddress_addressid",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customeraddress",
+      "target_id": "saleslt_customeraddress_addresstype",
+      "type": "CONTAINS",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customeraddress",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer_customerid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer_firstname",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer_lastname",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer_emailaddress",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customer_companyname",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product_productid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product_name",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product_productnumber",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product_color",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product_standardcost",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product_listprice",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product_productcategoryid",
+      "target_id": "saleslt_productcategory_productcategoryid",
+      "type": "REFERENCES",
+      "properties": {
+        "confidence": 1.0,
+        "description": "Product belongs to category",
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_product_productcategoryid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_productcategory_productcategoryid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_productcategory_name",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_productcategory_parentproductcategoryid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader_salesorderid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader_orderdate",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader_customerid",
+      "target_id": "saleslt_customer_customerid",
+      "type": "REFERENCES",
+      "properties": {
+        "confidence": 1.0,
+        "description": "Order placed by customer",
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader_customerid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader_subtotal",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderheader_totaldue",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail_salesorderdetailid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail_salesorderid",
+      "target_id": "saleslt_salesorderheader_salesorderid",
+      "type": "REFERENCES",
+      "properties": {
+        "confidence": 1.0,
+        "description": "Order detail belongs to order",
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail_salesorderid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail_productid",
+      "target_id": "saleslt_product_productid",
+      "type": "REFERENCES",
+      "properties": {
+        "confidence": 1.0,
+        "description": "Order detail for product",
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail_productid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail_orderqty",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail_unitprice",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_salesorderdetail_linetotal",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address_addressid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address_addressline1",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address_city",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address_stateprovince",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_address_countryregion",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customeraddress_customerid",
+      "target_id": "saleslt_customer_customerid",
+      "type": "REFERENCES",
+      "properties": {
+        "confidence": 1.0,
+        "description": "Customer has address",
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customeraddress_customerid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customeraddress_addressid",
+      "target_id": "saleslt_address_addressid",
+      "type": "REFERENCES",
+      "properties": {
+        "confidence": 1.0,
+        "description": "Address linked to customer",
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customeraddress_addressid",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "saleslt_customeraddress_addresstype",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "customer_orders",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "û",
+      "target_id": "default_project",
+      "type": "BELONGS_TO",
+      "properties": {
+        "confidence": 1.0,
+        "source": "parser",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "60b90e36e9479a3f973deb81578ace33fadae71a82e51ef94f18b45635a34e87",
+      "type": "DEFINES",
+      "properties": {
+        "confidence": 1.0,
+        "target_id": "60b90e36e9479a3f973deb81578ace33fadae71a82e51ef94f18b45635a34e87",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "2364cab3bc4b5f220ad492f95bf092bf043cd5500401426022c860d4f05edf3c",
+      "type": "DEFINES",
+      "properties": {
+        "confidence": 1.0,
+        "target_id": "2364cab3bc4b5f220ad492f95bf092bf043cd5500401426022c860d4f05edf3c",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "121360f326f50a6cd8be5c5d6854419dc82a34e05f8a7341dbfce73538b9e12d",
+      "type": "DEFINES",
+      "properties": {
+        "confidence": 1.0,
+        "target_id": "121360f326f50a6cd8be5c5d6854419dc82a34e05f8a7341dbfce73538b9e12d",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "087ab1cc61d074e0bdea2661f326804ffc4327a39b1948054a98da0c1e60314f",
+      "type": "IMPORTS",
+      "properties": {
+        "confidence": 1.0,
+        "target_id": "087ab1cc61d074e0bdea2661f326804ffc4327a39b1948054a98da0c1e60314f",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "b01d31f7a4f8d6934b2821c3aace23fc389752d14702eebb7fc27737d551204e",
+      "type": "IMPORTS",
+      "properties": {
+        "confidence": 1.0,
+        "target_id": "b01d31f7a4f8d6934b2821c3aace23fc389752d14702eebb7fc27737d551204e",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "bb070e6cd18a81becb03607a13bfa0ff8c7a5385ac6f0cd141adc186844de388",
+      "type": "IMPORTS",
+      "properties": {
+        "confidence": 1.0,
+        "target_id": "bb070e6cd18a81becb03607a13bfa0ff8c7a5385ac6f0cd141adc186844de388",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "54676b55140c909050a372f1f8a12107fcd5ac3a4cb0e15b9ca3050ad03ba1a3",
+      "type": "IMPORTS",
+      "properties": {
+        "confidence": 1.0,
+        "target_id": "54676b55140c909050a372f1f8a12107fcd5ac3a4cb0e15b9ca3050ad03ba1a3",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "1f4eff4ff0aa23b5cbdf311221c3211e446e0c3af772d61c7bcaa9eaac255cac",
+      "type": "READS_FROM",
+      "properties": {
+        "evidence": "Heuristic extraction from Python code in etl_postgre_to_sql.py",
+        "confidence": 1.0,
+        "target_id": "1f4eff4ff0aa23b5cbdf311221c3211e446e0c3af772d61c7bcaa9eaac255cac",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "d9fef5c4d9fee43be3463b99fca51979290a25f70149117e1a7d567eabc5db71",
+      "type": "READS_FROM",
+      "properties": {
+        "evidence": "Heuristic extraction from Python code in etl_postgre_to_sql.py",
+        "confidence": 1.0,
+        "target_id": "d9fef5c4d9fee43be3463b99fca51979290a25f70149117e1a7d567eabc5db71",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "6928deb879b50ef700484b6d4b399af9a125bb33c58c2afac57a5106407d6215",
+      "type": "READS_FROM",
+      "properties": {
+        "evidence": "Heuristic extraction from Python code in etl_postgre_to_sql.py",
+        "confidence": 1.0,
+        "target_id": "6928deb879b50ef700484b6d4b399af9a125bb33c58c2afac57a5106407d6215",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    },
+    {
+      "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+      "target_id": "2763a0e8184f17bcf12de1fd1be3f8653c637bc28b71723aafdd247049b67d1a",
+      "type": "READS_FROM",
+      "properties": {
+        "evidence": "Heuristic extraction from Python code in etl_postgre_to_sql.py",
+        "confidence": 1.0,
+        "target_id": "2763a0e8184f17bcf12de1fd1be3f8653c637bc28b71723aafdd247049b67d1a",
+        "source": "parser",
+        "source_id": "39ea79c4169b59591959dc1f64493ca5b87f5e667f4ecc70abc9882a48e8208e",
+        "status": "approved"
+      }
+    }
+  ]
+}

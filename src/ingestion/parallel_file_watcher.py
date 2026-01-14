@@ -161,36 +161,32 @@ class ParallelFileWatcher:
         Args:
             file_path: Path to SQL file
         """
-        try:
-            logger.debug(f"[WORKER] Processing: {Path(file_path).name}")
+        logger.debug(f"[WORKER] Processing: {Path(file_path).name}")
 
-            # Use ProcessPoolExecutor from worker pool for CPU-bound parsing
-            # This offloads regex-intensive SQL parsing to a separate process
-            loop = asyncio.get_event_loop()
+        # Use ProcessPoolExecutor from worker pool for CPU-bound parsing
+        # This offloads regex-intensive SQL parsing to a separate process
+        loop = asyncio.get_event_loop()
 
-            # Get executor from worker pool (ProcessPoolExecutor for true parallelism)
-            executor = (
-                self.worker_pool.executor
-                if self.worker_pool and self.worker_pool.executor
-                else None
+        # Get executor from worker pool (ProcessPoolExecutor for true parallelism)
+        executor = (
+            self.worker_pool.executor
+            if self.worker_pool and self.worker_pool.executor
+            else None
+        )
+
+        results = await loop.run_in_executor(
+            executor,  # Use ProcessPoolExecutor instead of default ThreadPoolExecutor
+            self.organizer.organize_file,
+            file_path,
+        )
+
+        if results:
+            logger.info(
+                f"[OK] Processed {Path(file_path).name}: "
+                f"{sum(len(v) for v in results.values())} files created"
             )
-
-            results = await loop.run_in_executor(
-                executor,  # Use ProcessPoolExecutor instead of default ThreadPoolExecutor
-                self.organizer.organize_file,
-                file_path,
-            )
-
-            if results:
-                logger.info(
-                    f"[OK] Processed {Path(file_path).name}: "
-                    f"{sum(len(v) for v in results.values())} files created"
-                )
-            else:
-                logger.warning(f"[WARN] No objects found in: {Path(file_path).name}")
-
-        except Exception as e:
-            logger.error(f"[ERROR] Failed to process {file_path}: {e}", exc_info=True)
+        else:
+            logger.warning(f"[WARN] No objects found in: {Path(file_path).name}")
 
     async def _process_batch(self, file_paths: List[str]):
         """

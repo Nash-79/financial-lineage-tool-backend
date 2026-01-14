@@ -181,7 +181,7 @@ class Neo4jGraphClient:
         where_params = ["toLower(n.name) CONTAINS toLower($pattern)"]
         if project_id:
             where_params.append("n.project_id = $project_id")
-            
+
         where_clause = " AND ".join(where_params)
 
         query = f"""
@@ -191,7 +191,9 @@ class Neo4jGraphClient:
         LIMIT 100
         """
 
-        results = self._execute_query(query, {"pattern": name_pattern, "project_id": project_id})
+        results = self._execute_query(
+            query, {"pattern": name_pattern, "project_id": project_id}
+        )
 
         entities = []
         for record in results:
@@ -207,7 +209,9 @@ class Neo4jGraphClient:
 
         return entities
 
-    def find_by_names(self, names: List[str], project_id: str = None, limit: int = 50) -> list[dict]:
+    def find_by_names(
+        self, names: List[str], project_id: str = None, limit: int = 50
+    ) -> list[dict]:
         """
         Find nodes by multiple name patterns in a single query (batch operation).
 
@@ -231,7 +235,9 @@ class Neo4jGraphClient:
             return []
 
         # Build WHERE clause
-        where_params = ["ANY(pattern IN $patterns WHERE toLower(n.name) CONTAINS pattern)"]
+        where_params = [
+            "ANY(pattern IN $patterns WHERE toLower(n.name) CONTAINS pattern)"
+        ]
         if project_id:
             where_params.append("n.project_id = $project_id")
 
@@ -246,7 +252,7 @@ class Neo4jGraphClient:
 
         results = self._execute_query(
             query,
-            {"patterns": filtered_names, "project_id": project_id, "limit": limit}
+            {"patterns": filtered_names, "project_id": project_id, "limit": limit},
         )
 
         entities = []
@@ -293,6 +299,122 @@ class Neo4jGraphClient:
             query,
             {"source_id": source_id, "target_id": target_id, "properties": properties},
         )
+
+    # ==================== Project Operations ====================
+
+    def upsert_project_node(
+        self,
+        *,
+        project_id: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        """Create or update a Project node."""
+        properties: Dict[str, Any] = {}
+        if name is not None:
+            properties["name"] = name
+        if description is not None:
+            properties["description"] = description
+
+        query = """
+        MERGE (p:Project {id: $project_id})
+        SET p += $properties
+        RETURN p.id as id
+        """
+        self._execute_write(
+            query,
+            {"project_id": project_id, "properties": properties},
+        )
+
+    def link_projects(
+        self,
+        *,
+        source_project_id: str,
+        target_project_id: str,
+        link_type: str = "manual",
+        description: Optional[str] = None,
+    ) -> None:
+        """Create or update a relationship between two projects."""
+        properties: Dict[str, Any] = {"link_type": link_type}
+        if description is not None:
+            properties["description"] = description
+
+        query = """
+        MERGE (source:Project {id: $source_project_id})
+        MERGE (target:Project {id: $target_project_id})
+        MERGE (source)-[r:PROJECT_LINK]->(target)
+        ON CREATE SET r.created_at = datetime()
+        SET r += $properties
+        RETURN r
+        """
+        self._execute_write(
+            query,
+            {
+                "source_project_id": source_project_id,
+                "target_project_id": target_project_id,
+                "properties": properties,
+            },
+        )
+
+    def unlink_projects(
+        self,
+        *,
+        source_project_id: str,
+        target_project_id: str,
+    ) -> None:
+        """Remove a relationship between two projects."""
+        query = """
+        MATCH (source:Project {id: $source_project_id})-[r:PROJECT_LINK]->(target:Project {id: $target_project_id})
+        DELETE r
+        """
+        self._execute_write(
+            query,
+            {
+                "source_project_id": source_project_id,
+                "target_project_id": target_project_id,
+            },
+        )
+
+    def purge_file_assets(
+        self,
+        file_path: str,
+        project_id: Optional[str] = None,
+        repository_id: Optional[str] = None,
+    ) -> int:
+        """
+        Delete all nodes associated with a file path.
+
+        Args:
+            file_path: File path to purge from the graph.
+            project_id: Optional project scope for purge.
+            repository_id: Optional repository scope for purge.
+
+        Returns:
+            Count of deleted nodes.
+        """
+        where_clauses = [
+            "(n.source_file = $file_path OR n.path = $file_path OR n.file_path = $file_path)"
+        ]
+        params = {"file_path": file_path}
+        if project_id:
+            where_clauses.append("n.project_id = $project_id")
+            params["project_id"] = project_id
+        if repository_id:
+            where_clauses.append("n.repository_id = $repository_id")
+            params["repository_id"] = repository_id
+
+        where_sql = " AND ".join(where_clauses)
+        query = f"""
+        MATCH (n)
+        WHERE {where_sql}
+        WITH collect(n) as nodes, count(n) as deleted
+        FOREACH (node IN nodes | DETACH DELETE node)
+        RETURN deleted
+        """
+        results = self._execute_write(query, params)
+        if results:
+            return results[0].get("deleted", 0)
+        return 0
 
     # ==================== Batch Operations ====================
 
@@ -665,7 +787,7 @@ class Neo4jGraphClient:
         where_clauses = ["(source.project_id = $project_id OR $project_id IS NULL)"]
         if repo_ids:
             where_clauses.append("(source.repository_id IN $repo_ids)")
-        
+
         where_stmt = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
         query = """
@@ -682,17 +804,12 @@ class Neo4jGraphClient:
             idx as depth
         LIMIT 100
         """.format(
-            max_depth=max_depth,
-            where_stmt=where_stmt
+            max_depth=max_depth, where_stmt=where_stmt
         )
 
         return self._execute_query(
             query,
-            {
-                "entity_id": entity_id,
-                "project_id": project_id,
-                "repo_ids": repo_ids
-            }
+            {"entity_id": entity_id, "project_id": project_id, "repo_ids": repo_ids},
         )
 
     def get_downstream(
@@ -718,7 +835,7 @@ class Neo4jGraphClient:
         where_clauses = ["(target.project_id = $project_id OR $project_id IS NULL)"]
         if repo_ids:
             where_clauses.append("(target.repository_id IN $repo_ids)")
-        
+
         where_stmt = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
         query = """
@@ -735,17 +852,12 @@ class Neo4jGraphClient:
             idx as depth
         LIMIT 100
         """.format(
-            max_depth=max_depth,
-            where_stmt=where_stmt
+            max_depth=max_depth, where_stmt=where_stmt
         )
 
         return self._execute_query(
-            query, 
-            {
-                "entity_id": entity_id,
-                "project_id": project_id,
-                "repo_ids": repo_ids
-            }
+            query,
+            {"entity_id": entity_id, "project_id": project_id, "repo_ids": repo_ids},
         )
 
     def get_path(self, source_id: str, target_id: str) -> list[str]:

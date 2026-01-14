@@ -3,6 +3,9 @@
 **Last Updated**: 2025-12-08
 **Version**: 1.0.0
 
+Note: Some sections refer to the legacy organizer pipeline (`data/raw` -> `data/separated_sql`).
+For the current run-scoped ingestion pipeline, see `../ingestion/INGESTION_OVERVIEW.md`.
+
 ## Overview
 
 This document tracks the implementation status of the Financial Lineage Tool, a comprehensive system for SQL database analysis, knowledge graph creation, and data lineage visualization.
@@ -101,9 +104,9 @@ python examples/test_file_watcher_once.py
 ### 2. Documentation ✅
 
 #### 2.1 User Guides
-- **SQL_ORGANIZER_QUICKSTART.md**: Basic organizer guide
-- **HIERARCHICAL_ORGANIZATION_GUIDE.md**: Hierarchical organizer comprehensive guide
-- **FILE_WATCHER_GUIDE.md**: File watcher usage and integration guide
+- **ingestion/legacy/SQL_ORGANIZER_QUICKSTART.md**: Basic organizer guide
+- **ingestion/legacy/HIERARCHICAL_ORGANIZATION_GUIDE.md**: Hierarchical organizer comprehensive guide
+- **ingestion/legacy/FILE_WATCHER_GUIDE.md**: File watcher usage and integration guide
 - **IMPLEMENTATION_STATUS.md**: This document
 
 #### 2.2 Example Scripts

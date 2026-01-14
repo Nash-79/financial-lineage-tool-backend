@@ -21,18 +21,15 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s: %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
 PRESERVED_ITEMS = {
-    'metadata.duckdb',
-    'metadata.duckdb.wal',
-    'contexts',
-    'archive',  # Don't re-archive
+    "metadata.duckdb",
+    "metadata.duckdb.wal",
+    "contexts",
+    "archive",  # Don't re-archive
 }
 
 
@@ -45,7 +42,7 @@ def is_new_structure_directory(path: Path) -> bool:
     for subdir in path.iterdir():
         if subdir.is_dir():
             # Pattern: YYYYMMDD_HHmmss_NNN_action
-            parts = subdir.name.split('_')
+            parts = subdir.name.split("_")
             if len(parts) >= 3 and parts[0].isdigit() and len(parts[0]) == 8:
                 return True
     return False
@@ -98,7 +95,9 @@ def migrate_item(source: Path, archive_dir: Path, dry_run: bool) -> bool:
         return False
 
 
-def verify_and_cleanup(legacy_items: list[Path], archive_dir: Path, dry_run: bool) -> int:
+def verify_and_cleanup(
+    legacy_items: list[Path], archive_dir: Path, dry_run: bool
+) -> int:
     """Verify migration and remove originals."""
     removed = 0
 
@@ -144,13 +143,13 @@ def log_migration(archive_dir: Path, count: int, dry_run: bool):
             "migration": "structure-data-outputs",
             "archive_location": str(archive_dir),
             "files_migrated": count,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         client.execute_write(
             """INSERT INTO system_logs (log_id, level, source, message, context)
                VALUES (?, 'INFO', 'migration', ?, ?)""",
-            (str(uuid.uuid4()), f"Migrated {count} legacy files", json.dumps(context))
+            (str(uuid.uuid4()), f"Migrated {count} legacy files", json.dumps(context)),
         )
         logger.info("Logged to DuckDB")
     except Exception as e:
@@ -158,10 +157,18 @@ def log_migration(archive_dir: Path, count: int, dry_run: bool):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Migrate to hierarchical runs structure")
-    parser.add_argument("--dry-run", action="store_true", help="Preview without changes")
-    parser.add_argument("--data-dir", type=Path, default=Path("data"), help="Data directory")
-    parser.add_argument("--no-cleanup", action="store_true", help="Keep originals after migration")
+    parser = argparse.ArgumentParser(
+        description="Migrate to hierarchical runs structure"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Preview without changes"
+    )
+    parser.add_argument(
+        "--data-dir", type=Path, default=Path("data"), help="Data directory"
+    )
+    parser.add_argument(
+        "--no-cleanup", action="store_true", help="Keep originals after migration"
+    )
 
     args = parser.parse_args()
     data_dir = args.data_dir.resolve()
@@ -199,7 +206,9 @@ def main():
 
     # Step 3: Migrate
     logger.info("Step 3: Migrating files...")
-    success_count = sum(1 for item in legacy_items if migrate_item(item, archive_dir, args.dry_run))
+    success_count = sum(
+        1 for item in legacy_items if migrate_item(item, archive_dir, args.dry_run)
+    )
     logger.info(f"Migrated: {success_count}/{len(legacy_items)}")
     logger.info("")
 

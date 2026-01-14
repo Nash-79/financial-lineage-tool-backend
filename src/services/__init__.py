@@ -7,6 +7,10 @@ from .qdrant_service import QdrantLocalClient
 from .agent_service import LocalSupervisorAgent
 from .memory_service import MemoryService
 from .lineage_inference import LineageInferenceService
+from .inference_service import OpenRouterService
+from .chat_service import ChatService
+from .validation_agent import ValidationAgent
+from .kg_enrichment_agent import KGEnrichmentAgent
 from .ingestion_tracker import (
     IngestionTracker,
     IngestionSession,
@@ -22,6 +26,10 @@ __all__ = [
     "LocalSupervisorAgent",
     "MemoryService",
     "LineageInferenceService",
+    "OpenRouterService",
+    "ChatService",
+    "ValidationAgent",
+    "KGEnrichmentAgent",
     "IngestionTracker",
     "IngestionSession",
     "IngestionStatus",

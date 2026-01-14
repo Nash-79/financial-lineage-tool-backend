@@ -1,6 +1,7 @@
 """
 Test Qdrant connection and embedding storage.
 """
+
 import os
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
@@ -8,6 +9,7 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 
 # Load environment variables
 load_dotenv()
+
 
 def test_qdrant():
     """Test Qdrant connection and operations."""
@@ -47,7 +49,7 @@ def test_qdrant():
             # Create new collection
             client.create_collection(
                 collection_name=collection_name,
-                vectors_config=VectorParams(size=768, distance=Distance.COSINE)
+                vectors_config=VectorParams(size=768, distance=Distance.COSINE),
             )
             print(f"[+] Created collection '{collection_name}'")
 
@@ -64,24 +66,21 @@ def test_qdrant():
                 PointStruct(
                     id=1,
                     vector=[0.1] * 768,
-                    payload={"text": "Customer table", "type": "Table"}
+                    payload={"text": "Customer table", "type": "Table"},
                 ),
                 PointStruct(
                     id=2,
                     vector=[0.2] * 768,
-                    payload={"text": "Product table", "type": "Table"}
+                    payload={"text": "Product table", "type": "Table"},
                 ),
                 PointStruct(
                     id=3,
                     vector=[0.3] * 768,
-                    payload={"text": "CustomerID column", "type": "Column"}
+                    payload={"text": "CustomerID column", "type": "Column"},
                 ),
             ]
 
-            client.upsert(
-                collection_name=collection_name,
-                points=test_points
-            )
+            client.upsert(collection_name=collection_name, points=test_points)
             print(f"[+] Inserted 3 test vectors")
 
         except Exception as e:
@@ -94,9 +93,7 @@ def test_qdrant():
         try:
             # Search using a query vector
             search_result = client.query_points(
-                collection_name=collection_name,
-                query=[0.15] * 768,
-                limit=2
+                collection_name=collection_name, query=[0.15] * 768, limit=2
             )
 
             print(f"[+] Found {len(search_result.points)} results:")
@@ -132,6 +129,7 @@ def test_qdrant():
     except Exception as e:
         print(f"\n[!] Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

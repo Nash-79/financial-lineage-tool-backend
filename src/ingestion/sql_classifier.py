@@ -77,12 +77,13 @@ class SQLClassifier:
         """
         self.dialect = dialect
         self._resolved_dialect = None  # Cached resolved dialect
-    
+
     def _get_resolved_dialect(self) -> str:
         """Get resolved sqlglot dialect, resolving 'auto' to concrete dialect."""
         if self._resolved_dialect is None:
             try:
                 from ..config.sql_dialects import resolve_dialect_for_parsing
+
                 self._resolved_dialect = resolve_dialect_for_parsing(self.dialect)
             except Exception:
                 # Fallback to tsql if resolution fails
@@ -170,7 +171,7 @@ class SQLClassifier:
             name=name,
             schema=schema,
             database=database,
-            sql_content=stmt.sql(dialect=self.dialect),
+            sql_content=stmt.sql(dialect=self._get_resolved_dialect()),
         )
 
     def _extract_view(self, stmt: exp.Create) -> SQLObject:
@@ -186,7 +187,7 @@ class SQLClassifier:
             name=name,
             schema=schema,
             database=database,
-            sql_content=stmt.sql(dialect=self.dialect),
+            sql_content=stmt.sql(dialect=self._get_resolved_dialect()),
         )
 
     def _extract_function(self, stmt: exp.Create) -> SQLObject:
@@ -200,7 +201,7 @@ class SQLClassifier:
             object_type=SQLObjectType.FUNCTION,
             name=name,
             schema=schema,
-            sql_content=stmt.sql(dialect=self.dialect),
+            sql_content=stmt.sql(dialect=self._get_resolved_dialect()),
         )
 
     def _extract_procedure(self, stmt: exp.Create) -> SQLObject:
@@ -214,7 +215,7 @@ class SQLClassifier:
             object_type=SQLObjectType.PROCEDURE,
             name=name,
             schema=schema,
-            sql_content=stmt.sql(dialect=self.dialect),
+            sql_content=stmt.sql(dialect=self._get_resolved_dialect()),
         )
 
     def _extract_index(self, stmt: exp.Create) -> SQLObject:
@@ -222,7 +223,7 @@ class SQLClassifier:
         return SQLObject(
             object_type=SQLObjectType.INDEX,
             name=str(stmt.this),
-            sql_content=stmt.sql(dialect=self.dialect),
+            sql_content=stmt.sql(dialect=self._get_resolved_dialect()),
         )
 
     def _extract_schema(self, stmt: exp.Create) -> SQLObject:
@@ -230,7 +231,7 @@ class SQLClassifier:
         return SQLObject(
             object_type=SQLObjectType.SCHEMA,
             name=str(stmt.this),
-            sql_content=stmt.sql(dialect=self.dialect),
+            sql_content=stmt.sql(dialect=self._get_resolved_dialect()),
         )
 
     def _classify_with_regex(self, content: str) -> List[SQLObject]:

@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  signoz-clickhouse:
+    image: clickhouse/clickhouse-server:23.3.7-alpine
+    container_name: signoz-clickhouse
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - signoz-clickhouse:/var/lib/clickhouse
+
+  signoz-query-service:
+    image: signoz/query-service:latest
+    container_name: signoz-query-service
+    restart: unless-stopped
+    depends_on:
+      - signoz-clickhouse
+    environment:
+      - CLICKHOUSE_HOST=signoz-clickhouse
+      - SIGNOZ_TELEMETRYSTORE_PROVIDER=clickhouse
+      - SIGNOZ_SQLSTORE_SQLITE_PATH=/var/lib/signoz/signoz.db
+    ports:
+      - "8081:8080"
+    volumes:
+      - signoz-data:/var/lib/signoz
+
+  signoz-frontend:
+    image: signoz/frontend:latest
+    container_name: signoz-frontend
+    restart: unless-stopped
+    depends_on:
+      - signoz-query-service
+    environment:
+      - SIGNOZ_API_URL=http://signoz-query-service:8080
+    ports:
+      - "3301:3301"
+
+  signoz-otel-collector:
+    image: signoz/signoz-otel-collector:latest
+    container_name: signoz-otel-collector
+    restart: unless-stopped
+    depends_on:
+      - signoz-query-service
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./docs/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+volumes:
+  signoz-clickhouse:
+  signoz-data:

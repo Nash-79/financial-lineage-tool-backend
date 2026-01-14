@@ -21,10 +21,7 @@ new_settings = {
     "allowed_extensions": [".sql", ".py", ".json", ".csv", ".md", ".ddl", ".ipynb"]
 }
 
-response = requests.put(
-    "http://localhost:8000/api/v1/files/config",
-    json=new_settings
-)
+response = requests.put("http://localhost:8000/api/v1/files/config", json=new_settings)
 print(f"Status: {response.status_code}")
 if response.status_code == 200:
     print(f"Response: {json.dumps(response.json(), indent=2)}")

@@ -4,6 +4,41 @@ This document tracks all DuckDB schema migrations applied to the system.
 
 ## Migration History
 
+### Version 6 (2026-01-13)
+**OpenSpec Change**: enhance-zero-cost-hybrid-lineage
+
+**Changes**:
+- Rebuilt `files` table without PRIMARY KEY (uses UNIQUE index on `id`)
+- Added `project_links` table for cross-project relationships
+- Refreshed file macros with repository-aware signatures
+  - `find_duplicate_file(proj_id, repo_id, rel_path, fhash)`
+  - `find_previous_file_version(proj_id, repo_id, rel_path)`
+
+**Affected Features**:
+- File status updates (DuckDB constraint fix)
+- Project-to-project linking
+- File deduplication macros
+
+**Risk**: Medium (table rebuild + data copy)
+
+---
+
+### Version 5 (2026-01-09)
+**OpenSpec Change**: align-frontend-backend-api
+
+**Changes**:
+- Added file metadata columns: `relative_path`, `file_type`, `source`, `repository_id`, `status`
+- Added indexes for file filtering and status queries
+- Updated file deduplication macros to be repository-aware
+
+**Affected Features**:
+- File listing and filtering
+- Repository-scoped deduplication
+
+**Risk**: Low (additive columns)
+
+---
+
 ### Version 4 (2026-01-03)
 **OpenSpec Change**: persist-upload-settings
 
@@ -35,8 +70,8 @@ This document tracks all DuckDB schema migrations applied to the system.
   - `idx_files_run`
 - Added 3 DuckDB macros for business logic:
   - `get_next_sequence(proj_id, ts)` - Get next sequence number
-  - `find_duplicate_file(proj_id, fname, fhash)` - Find duplicates by hash
-  - `find_previous_file_version(proj_id, fname)` - Find previous versions
+  - `find_duplicate_file(proj_id, repo_id, rel_path, fhash)` - Find duplicates by hash
+  - `find_previous_file_version(proj_id, repo_id, rel_path)` - Find previous versions
 
 **Affected Features**:
 - File upload with content hashing
@@ -89,10 +124,10 @@ curl http://localhost:8000/health | jq '.database'
 Expected response:
 ```json
 {
-  "schema_version": 4,
+  "schema_version": 6,
   "is_current": true,
-  "total_migrations": 4,
-  "last_migration": "2026-01-03T12:00:00"
+  "total_migrations": 6,
+  "last_migration": "2026-01-13T12:00:00"
 }
 ```
 
@@ -115,8 +150,8 @@ Expected output:
 ```
 ======================================================================
 DATABASE SCHEMA MIGRATION CHECK
-Current version: 4
-Target version: 4
+Current version: 6
+Target version: 6
 Schema is up-to-date
 ======================================================================
 ```
@@ -180,6 +215,6 @@ docker restart lineage-api
 
 ## Related Documentation
 
-- [DuckDB Client Implementation](../src/storage/duckdb_client.py)
-- [OpenSpec Changes](../openspec/changes/)
-- [Health Endpoint Documentation](../src/api/routers/health.py)
+- [DuckDB Client Implementation](../../src/storage/duckdb_client.py)
+- [OpenSpec Changes](../../openspec/changes/)
+- [Health Endpoint Documentation](../../src/api/routers/health.py)

@@ -1,0 +1,65 @@
+{
+  "model": "llama-3.1-8b-instant",
+  "provider": "groq",
+  "accuracy": 0.2424074074074074,
+  "citation_quality": 0.9444444444444444,
+  "hallucination_rate": 0.775387145998181,
+  "completeness": 0.175,
+  "ttft_ms": [],
+  "total_latency_ms": [
+    795.5338954925537,
+    607.74827003479,
+    539.4775867462158,
+    634.6995830535889,
+    565.2308464050293,
+    536.6334915161133,
+    1173.7003326416016,
+    967.2596454620361,
+    507.0197582244873,
+    442.2783851623535,
+    441.4975643157959,
+    1016.423225402832,
+    716.7248725891113,
+    1075.4516124725342,
+    427.54364013671875,
+    608.3288192749023,
+    556.9643974304199,
+    441.74861907958984
+  ],
+  "by_category": {
+    "join_analysis": {
+      "count": 5,
+      "accuracy": 0.25066666666666665,
+      "completeness": 0.10666666666666666
+    },
+    "schema_lookup": {
+      "count": 5,
+      "accuracy": 0.29333333333333333,
+      "completeness": 0.4
+    },
+    "data_flow": {
+      "count": 5,
+      "accuracy": 0.1873333333333333,
+      "completeness": 0.12333333333333334
+    },
+    "transformation_logic": {
+      "count": 3,
+      "accuracy": 0.23555555555555555,
+      "completeness": 0.0
+    }
+  },
+  "by_difficulty": {},
+  "failed_questions": [
+    {
+      "id": "transform_qa_004",
+      "question": "What aggregations are performed in the sales rollup?",
+      "error": "LLM generation failed (groq:llama-3.1-8b-instant): Groq rate limit exceeded (30 req/min)"
+    },
+    {
+      "id": "transform_qa_005",
+      "question": "How are dates handled in the time dimension query?",
+      "error": "LLM generation failed (groq:llama-3.1-8b-instant): Groq rate limit exceeded (30 req/min)"
+    }
+  ],
+  "avg_latency_ms": 669.681363635593
+}

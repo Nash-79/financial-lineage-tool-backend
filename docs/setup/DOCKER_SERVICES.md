@@ -29,8 +29,7 @@ We categorize services into three roles:
 
 | Service | Description | Compose File |
 |---------|-------------|--------------|
-| `prometheus` | Metrics collection. | `docker-compose.yml` |
-| `grafana` | Visualization dashboards. | `docker-compose.yml` |
+| `signoz` | Observability UI + OTLP collector for logs, traces, and metrics. | `docker-compose.signoz.yml` |
 | `jupyter` | Interactive notebook environment for data exploration. | `docker-compose.local.yml` |
 
 ## Environments

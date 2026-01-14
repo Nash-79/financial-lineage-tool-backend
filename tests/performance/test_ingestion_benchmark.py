@@ -16,7 +16,6 @@ from typing import List, Dict, Any
 # Import optimization components
 from src.ingestion.parse_cache import ParseCache
 from src.ingestion.batch_processor import BatchProcessor
-from src.ingestion.worker_pool import WorkerPool
 from src.config.feature_flags import FeatureFlags
 
 
@@ -80,7 +79,7 @@ END;
         sizes = {
             "small": {"tables": 2, "views": 1, "procedures": 1},
             "medium": {"tables": 5, "views": 3, "procedures": 2},
-            "large": {"tables": 10, "views": 6, "procedures": 4}
+            "large": {"tables": 10, "views": 6, "procedures": 4},
         }
 
         counts = sizes.get(size_category, sizes["medium"])
@@ -89,31 +88,34 @@ END;
 
         # Generate tables
         for i in range(counts["tables"]):
-            content.append(table_template.format(
-                schema="dbo",
-                table_name=f"test_table_{i}"
-            ))
+            content.append(
+                table_template.format(schema="dbo", table_name=f"test_table_{i}")
+            )
 
         # Generate views
         for i in range(counts["views"]):
-            content.append(view_template.format(
-                schema="dbo",
-                view_name=f"test_view_{i}",
-                source_table1=f"test_table_{i % counts['tables']}",
-                source_table2=f"test_table_{(i + 1) % counts['tables']}",
-                join_col="id"
-            ))
+            content.append(
+                view_template.format(
+                    schema="dbo",
+                    view_name=f"test_view_{i}",
+                    source_table1=f"test_table_{i % counts['tables']}",
+                    source_table2=f"test_table_{(i + 1) % counts['tables']}",
+                    join_col="id",
+                )
+            )
 
         # Generate procedures
         for i in range(counts["procedures"]):
-            content.append(procedure_template.format(
-                schema="dbo",
-                proc_name=f"test_proc_{i}",
-                target_table=f"test_table_{i % counts['tables']}"
-            ))
+            content.append(
+                procedure_template.format(
+                    schema="dbo",
+                    proc_name=f"test_proc_{i}",
+                    target_table=f"test_table_{i % counts['tables']}",
+                )
+            )
 
         # Write to file
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write("\n".join(content))
 
     @classmethod
@@ -135,7 +137,7 @@ END;
         size_distribution = {
             "small": int(file_count * 0.6),  # 60% small files
             "medium": int(file_count * 0.3),  # 30% medium files
-            "large": int(file_count * 0.1)    # 10% large files
+            "large": int(file_count * 0.1),  # 10% large files
         }
 
         file_idx = 0
@@ -154,8 +156,7 @@ class BenchmarkRunner:
 
     @staticmethod
     def measure_parse_performance(
-        file_paths: List[str],
-        use_cache: bool = False
+        file_paths: List[str], use_cache: bool = False
     ) -> Dict[str, Any]:
         """
         Measure SQL parsing performance.
@@ -182,7 +183,7 @@ class BenchmarkRunner:
         total_objects = 0
 
         for file_path in file_paths:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
             results = parser.parse_sql_file(content, file_path)
@@ -198,14 +199,14 @@ class BenchmarkRunner:
             "duration_seconds": duration,
             "files_processed": len(file_paths),
             "throughput_files_per_second": len(file_paths) / duration,
-            "objects_extracted": total_objects
+            "objects_extracted": total_objects,
         }
 
     @staticmethod
     async def measure_batch_performance(
         file_paths: List[str],
         enable_batching: bool = True,
-        debounce_window: float = 0.1
+        debounce_window: float = 0.1,
     ) -> Dict[str, Any]:
         """
         Measure batch processing performance.
@@ -227,7 +228,7 @@ class BenchmarkRunner:
             process_callback=process_callback,
             debounce_window=debounce_window,
             batch_size_threshold=50,
-            enable_batching=enable_batching
+            enable_batching=enable_batching,
         )
 
         # Measure time
@@ -250,11 +251,12 @@ class BenchmarkRunner:
             "files_processed": len(processed_files),
             "throughput_files_per_second": len(processed_files) / duration,
             "batches_created": stats["batches_processed"],
-            "deduplication_rate": stats["deduplication_rate_percent"]
+            "deduplication_rate": stats["deduplication_rate_percent"],
         }
 
 
 # ==================== Benchmark Tests ====================
+
 
 @pytest.mark.benchmark
 @pytest.mark.slow
@@ -271,26 +273,31 @@ def test_parse_cache_performance():
 
         # Baseline: No cache
         baseline_metrics = BenchmarkRunner.measure_parse_performance(
-            corpus,
-            use_cache=False
+            corpus, use_cache=False
         )
 
         # Optimized: With cache (parse twice to get cache hits)
         _ = BenchmarkRunner.measure_parse_performance(corpus, use_cache=True)
         optimized_metrics = BenchmarkRunner.measure_parse_performance(
-            corpus,
-            use_cache=True
+            corpus, use_cache=True
         )
 
         # Calculate improvement
-        improvement = baseline_metrics["throughput_files_per_second"] / optimized_metrics["throughput_files_per_second"]
+        improvement = (
+            baseline_metrics["throughput_files_per_second"]
+            / optimized_metrics["throughput_files_per_second"]
+        )
 
         # Report
         print("\n" + "=" * 70)
         print("PARSE CACHE BENCHMARK")
         print("=" * 70)
-        print(f"Baseline throughput:  {baseline_metrics['throughput_files_per_second']:.2f} files/sec")
-        print(f"Optimized throughput: {optimized_metrics['throughput_files_per_second']:.2f} files/sec")
+        print(
+            f"Baseline throughput:  {baseline_metrics['throughput_files_per_second']:.2f} files/sec"
+        )
+        print(
+            f"Optimized throughput: {optimized_metrics['throughput_files_per_second']:.2f} files/sec"
+        )
         print(f"Improvement:          {1/improvement:.2f}x faster")
         print("=" * 70)
 
@@ -315,32 +322,38 @@ async def test_batch_processing_performance():
 
         # Baseline: No batching (immediate processing)
         baseline_metrics = await BenchmarkRunner.measure_batch_performance(
-            corpus,
-            enable_batching=False
+            corpus, enable_batching=False
         )
 
         # Optimized: With batching
         optimized_metrics = await BenchmarkRunner.measure_batch_performance(
-            corpus,
-            enable_batching=True,
-            debounce_window=0.1
+            corpus, enable_batching=True, debounce_window=0.1
         )
 
         # Calculate improvement
-        improvement = optimized_metrics["throughput_files_per_second"] / baseline_metrics["throughput_files_per_second"]
+        improvement = (
+            optimized_metrics["throughput_files_per_second"]
+            / baseline_metrics["throughput_files_per_second"]
+        )
 
         # Report
         print("\n" + "=" * 70)
         print("BATCH PROCESSING BENCHMARK")
         print("=" * 70)
-        print(f"Baseline throughput:  {baseline_metrics['throughput_files_per_second']:.2f} files/sec")
-        print(f"Optimized throughput: {optimized_metrics['throughput_files_per_second']:.2f} files/sec")
+        print(
+            f"Baseline throughput:  {baseline_metrics['throughput_files_per_second']:.2f} files/sec"
+        )
+        print(
+            f"Optimized throughput: {optimized_metrics['throughput_files_per_second']:.2f} files/sec"
+        )
         print(f"Batches created:      {optimized_metrics['batches_created']}")
         print(f"Improvement:          {improvement:.2f}x faster")
         print("=" * 70)
 
         # Assert improvement
-        assert improvement >= 1.5, f"Batching should provide 1.5x+ improvement, got {improvement:.2f}x"
+        assert (
+            improvement >= 1.5
+        ), f"Batching should provide 1.5x+ improvement, got {improvement:.2f}x"
 
 
 @pytest.mark.benchmark
@@ -356,7 +369,9 @@ def test_feature_flags_baseline_mode():
     FeatureFlags.disable_all_optimizations()
 
     status = FeatureFlags.get_status()
-    assert all(not enabled for enabled in status.values()), "All flags should be disabled"
+    assert all(
+        not enabled for enabled in status.values()
+    ), "All flags should be disabled"
 
     # Re-enable for other tests
     FeatureFlags.enable_all_optimizations()
@@ -378,26 +393,29 @@ def test_generate_sql_corpus():
         # Verify files exist and have content
         for file_path in corpus:
             assert os.path.exists(file_path), f"File should exist: {file_path}"
-            assert os.path.getsize(file_path) > 0, f"File should not be empty: {file_path}"
+            assert (
+                os.path.getsize(file_path) > 0
+            ), f"File should not be empty: {file_path}"
 
             # Verify valid SQL content
-            with open(file_path, 'r') as f:
+            with open(file_path, "r") as f:
                 content = f.read()
-                assert "CREATE TABLE" in content or "CREATE VIEW" in content, \
-                    "File should contain SQL DDL"
+                assert (
+                    "CREATE TABLE" in content or "CREATE VIEW" in content
+                ), "File should contain SQL DDL"
 
 
 # ==================== CI/CD Integration ====================
+
 
 def pytest_configure(config):
     """Add benchmark marker to pytest configuration."""
     config.addinivalue_line(
         "markers",
-        "benchmark: marks tests as performance benchmarks (deselect with '-m \"not benchmark\"')"
+        "benchmark: marks tests as performance benchmarks (deselect with '-m \"not benchmark\"')",
     )
     config.addinivalue_line(
-        "markers",
-        "slow: marks tests as slow running (deselect with '-m \"not slow\"')"
+        "markers", "slow: marks tests as slow running (deselect with '-m \"not slow\"')"
     )
 
 

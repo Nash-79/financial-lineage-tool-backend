@@ -11,7 +11,7 @@ from src.utils.data_paths import (
     DataPathManager,
     normalize_database_name,
     detect_database_name,
-    get_path_manager
+    get_path_manager,
 )
 
 
@@ -23,7 +23,10 @@ class TestDatabaseNameNormalization:
         assert normalize_database_name("AdventureWorksLT-All") == "adventureworkslt-all"
 
     def test_normalize_underscores(self):
-        assert normalize_database_name("sample_financial_schema") == "sample-financial-schema"
+        assert (
+            normalize_database_name("sample_financial_schema")
+            == "sample-financial-schema"
+        )
 
     def test_normalize_spaces(self):
         assert normalize_database_name("My Database 123") == "my-database-123"
@@ -99,14 +102,20 @@ class TestDataPathManager:
         assert tables_dir.exists()
 
         customer_table = paths.separated_path("tables", "Customer.sql")
-        assert customer_table == temp_data_root / "test-db" / "separated" / "tables" / "Customer.sql"
+        assert (
+            customer_table
+            == temp_data_root / "test-db" / "separated" / "tables" / "Customer.sql"
+        )
 
     def test_embeddings_path(self, temp_data_root):
         """Test embeddings path construction."""
         paths = DataPathManager(data_root=temp_data_root, database_name="test-db")
 
         emb_file = paths.embeddings_path("sql_embeddings.json")
-        assert emb_file == temp_data_root / "test-db" / "embeddings" / "sql_embeddings.json"
+        assert (
+            emb_file
+            == temp_data_root / "test-db" / "embeddings" / "sql_embeddings.json"
+        )
         assert emb_file.parent.exists()
 
     def test_graph_path(self, temp_data_root):
@@ -122,7 +131,10 @@ class TestDataPathManager:
         paths = DataPathManager(data_root=temp_data_root, database_name="test-db")
 
         log_file = paths.metadata_path("failed_ingestion.jsonl")
-        assert log_file == temp_data_root / "test-db" / "metadata" / "failed_ingestion.jsonl"
+        assert (
+            log_file
+            == temp_data_root / "test-db" / "metadata" / "failed_ingestion.jsonl"
+        )
         assert log_file.parent.exists()
 
     def test_cache_path(self, temp_data_root):
@@ -138,7 +150,10 @@ class TestDataPathManager:
         paths = DataPathManager(data_root=temp_data_root, database_name="test-db")
 
         manifest = paths.separation_manifest_path()
-        assert manifest == temp_data_root / "test-db" / "separated" / "separation_manifest.json"
+        assert (
+            manifest
+            == temp_data_root / "test-db" / "separated" / "separation_manifest.json"
+        )
         assert manifest.parent.exists()
 
     def test_create_structure(self, temp_data_root):
@@ -154,7 +169,16 @@ class TestDataPathManager:
         assert (temp_data_root / "test-db" / "metadata").exists()
 
         # Check separated object type folders
-        for obj_type in ["tables", "views", "stored_procedures", "functions", "schemas", "indexes", "triggers", "unknown"]:
+        for obj_type in [
+            "tables",
+            "views",
+            "stored_procedures",
+            "functions",
+            "schemas",
+            "indexes",
+            "triggers",
+            "unknown",
+        ]:
             assert (temp_data_root / "test-db" / "separated" / obj_type).exists()
 
     def test_exists(self, temp_data_root):
@@ -258,7 +282,9 @@ class TestEndToEndIntegration:
         assert log_file.exists()
 
         # Verify structure
-        assert len(list(paths.database_dir.rglob("*"))) > 10  # Many files/folders created
+        assert (
+            len(list(paths.database_dir.rglob("*"))) > 10
+        )  # Many files/folders created
 
 
 if __name__ == "__main__":

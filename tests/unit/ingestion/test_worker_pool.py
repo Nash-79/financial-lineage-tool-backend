@@ -2,7 +2,7 @@
 
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 from src.ingestion.worker_pool import WorkerPool, Priority
 
 
@@ -16,7 +16,7 @@ class TestWorkerPool(unittest.IsolatedAsyncioTestCase):
             num_workers=2,
             max_queue_size=5,
             memory_threshold_percent=95.0,  # High threshold to avoid triggering in tests
-            enable_back_pressure=True
+            enable_back_pressure=True,
         )
 
         await self.pool.start()
@@ -81,6 +81,7 @@ class TestWorkerPool(unittest.IsolatedAsyncioTestCase):
 
     async def test_task_failure_handling(self):
         """Test worker handles task failures gracefully."""
+
         # Create callback that raises exception
         async def failing_callback(file_path: str):
             raise Exception("Test error")
@@ -126,9 +127,11 @@ class TestWorkerPool(unittest.IsolatedAsyncioTestCase):
                 await self.pool.submit(f"file{i}.sql", slow_callback, Priority.NORMAL)
             else:
                 # This should trigger back-pressure
-                with patch.object(self.pool, '_check_back_pressure') as mock_bp:
+                with patch.object(self.pool, "_check_back_pressure") as mock_bp:
                     mock_bp.return_value = asyncio.sleep(0)
-                    await self.pool.submit(f"file{i}.sql", slow_callback, Priority.NORMAL)
+                    await self.pool.submit(
+                        f"file{i}.sql", slow_callback, Priority.NORMAL
+                    )
                     mock_bp.assert_called_once()
 
     async def test_shutdown_waits_for_completion(self):
@@ -190,6 +193,7 @@ class TestWorkerPool(unittest.IsolatedAsyncioTestCase):
 
         async def timed_callback(file_path: str):
             import time
+
             start = time.time()
             await asyncio.sleep(0.1)
             processing_times.append((file_path, time.time() - start))
@@ -210,5 +214,5 @@ class TestWorkerPool(unittest.IsolatedAsyncioTestCase):
         self.assertLess(total_time, 0.4)  # Should be much less than sequential (0.4s)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,15 @@
+{
+  "ingestion_id": "e5e39659-347f-4f51-a85d-161781bdb999",
+  "source": "ingest",
+  "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+  "project_status": "active",
+  "repository_id": "manual",
+  "run_id": "8695ba9f-5e40-40b2-b953-54965b0b810d",
+  "status": "completed",
+  "started_at": "2026-01-13T18:07:03.335761",
+  "completed_at": "2026-01-13T18:08:08.591558",
+  "filenames": [
+    "postgres_investments_embeddings.sql"
+  ],
+  "source_repo": null
+}

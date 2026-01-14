@@ -368,6 +368,6 @@ qdrant:
 
 ## Next Steps
 
-- ✅ [LlamaIndex RAG Guide](LLAMAINDEX_RAG.md)
+- ✅ [LlamaIndex RAG Guide](../architecture/LLAMAINDEX_RAG.md)
 - ✅ [API Documentation](http://localhost:8000/docs)
-- ✅ [Architecture Overview](ARCHITECTURE.md)
+- ✅ [Architecture Overview](../architecture/ARCHITECTURE.md)

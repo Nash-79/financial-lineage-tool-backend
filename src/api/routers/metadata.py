@@ -6,21 +6,15 @@ and system maintenance tasks.
 """
 
 import logging
-import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from src.storage.duckdb_client import get_duckdb_client
-from src.storage.archive import (
-    export_to_parquet,
-    query_archived_parquet,
-    list_archives,
-    query_across_archives
-)
+from src.storage.archive import export_to_parquet, query_archived_parquet, list_archives
 from ..config import config
 
 logger = logging.getLogger(__name__)
@@ -30,13 +24,16 @@ router = APIRouter(prefix="/api/v1/metadata", tags=["metadata"])
 
 # ==================== Pydantic Models ====================
 
+
 class SqlQueryRequest(BaseModel):
     query: str
     params: List[Any] = []
 
+
 class ArchiveCreateRequest(BaseModel):
     year: int
     month: int
+
 
 class ArchiveQueryRequest(BaseModel):
     query: str
@@ -45,21 +42,21 @@ class ArchiveQueryRequest(BaseModel):
 
 # ==================== Query Endpoints ====================
 
+
 @router.post("/query")
 async def execute_sql(request: SqlQueryRequest) -> Dict[str, Any]:
     """
     Execute a read-only SQL query against DuckDB metadata.
-    
+
     Restricted to SELECT statements for security.
     """
     query = request.query.strip().upper()
-    
+
     # Basic SQL injection prevention (very distinct from parameterized queries)
     forbidden = ["UPDATE", "DELETE", "DROP", "ALTER", "INSERT", "TRUNCATE", "Create"]
     if any(cmd in query for cmd in forbidden):
         raise HTTPException(
-            status_code=400, 
-            detail="Only SELECT queries are allowed via this endpoint."
+            status_code=400, detail="Only SELECT queries are allowed via this endpoint."
         )
 
     try:
@@ -67,7 +64,7 @@ async def execute_sql(request: SqlQueryRequest) -> Dict[str, Any]:
         # Use simple execute method (we'll need to ensure read-only safety or use execute_query which returns df/list)
         # duckdb_client usually exposes specific methods, let's assume `execute` exists or similar
         # Based on previous summary, client has `execute_query` (returning list of dicts)
-        
+
         results = await client.execute_query(request.query, request.params)
         return {"results": results, "count": len(results)}
     except Exception as e:
@@ -134,6 +131,7 @@ async def get_ingestion_history(limit: int = 50) -> List[Dict[str, Any]]:
 
 # ==================== Archive Endpoints ====================
 
+
 @router.get("/archives")
 async def get_archives() -> List[str]:
     """List available archives."""
@@ -165,37 +163,38 @@ async def query_archive(request: ArchiveQueryRequest) -> Dict[str, Any]:
 
 # ==================== Backup & Maintenance ====================
 
+
 @router.post("/backup")
 async def create_backup() -> Dict[str, str]:
     """
     Create a backup of the DuckDB database file.
-    
+
     Locks the database during copy to ensure integrity.
     """
     if config.DUCKDB_PATH == ":memory:":
-         raise HTTPException(status_code=400, detail="Cannot backup in-memory database")
-         
+        raise HTTPException(status_code=400, detail="Cannot backup in-memory database")
+
     try:
         client = get_duckdb_client()
         # Ensure checkpoint/flush? DuckDB auto-checkpoints.
-        
+
         backup_dir = Path("data/backups")
         backup_dir.mkdir(parents=True, exist_ok=True)
-        
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = backup_dir / f"metadata_backup_{timestamp}.duckdb"
-        
+
         # Simple file copy (DuckDB safe usually only if closed or using EXPORT DATABASE)
         # Ideally use client's EXPORT DATABASE or VACUUM equivalent.
         # For simplicity in this spec, we'll try API level export or just copy if allowed.
         # Safe way: EXPORT DATABASE 'path' (parquet/csv) or copy file if we can impose a lock.
         # Implemented using EXPORT DATABASE for safety + portability
-        
+
         export_path = backup_dir / f"backup_{timestamp}"
         await client.execute_write(f"EXPORT DATABASE '{export_path}' (FORMAT PARQUET)")
-        
+
         return {"status": "success", "path": str(export_path)}
-        
+
     except Exception as e:
         logger.error(f"Backup failed: {e}")
         raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
@@ -205,10 +204,9 @@ async def create_backup() -> Dict[str, str]:
 async def search_metadata(q: str = Query(...)) -> Dict[str, Any]:
     """
     Full-text search across files/metadata.
-    
+
     Requires FTS extension enabled in DuckDB.
     """
     # Placeholder for FTS implementation
     # Need to check if FTS extension is available and indices built
     return {"results": [], "note": "FTS not yet fully configured"}
-

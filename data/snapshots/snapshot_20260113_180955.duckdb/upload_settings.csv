@@ -1,0 +1,2 @@
+id,allowed_extensions,max_file_size_mb,updated_at,updated_by
+default,"["".sql"", "".ddl"", "".csv"", "".json"", "".py"", "".ipynb""]",50,2026-01-09 21:48:41.451891,system

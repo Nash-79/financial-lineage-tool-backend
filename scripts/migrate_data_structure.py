@@ -52,7 +52,11 @@ from typing import Dict, List, Tuple
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils.data_paths import DataPathManager, detect_database_name, normalize_database_name
+from src.utils.data_paths import (
+    DataPathManager,
+    detect_database_name,
+    normalize_database_name,
+)
 
 
 class DataMigrator:
@@ -84,7 +88,7 @@ class DataMigrator:
             "metadata": [],
             "separated_dirs": [],
             "cache": [],
-            "unknown": []
+            "unknown": [],
         }
 
         if not self.data_root.exists():
@@ -119,9 +123,20 @@ class DataMigrator:
                 else:
                     # Could be database-specific folder (already migrated)
                     # or unknown directory
-                    if any((item / cat).exists() for cat in ["raw", "separated", "embeddings", "graph", "metadata"]):
+                    if any(
+                        (item / cat).exists()
+                        for cat in [
+                            "raw",
+                            "separated",
+                            "embeddings",
+                            "graph",
+                            "metadata",
+                        ]
+                    ):
                         # Already in new structure
-                        print(f"ℹ️  Skipping already migrated database folder: {item.name}")
+                        print(
+                            f"ℹ️  Skipping already migrated database folder: {item.name}"
+                        )
                     else:
                         categories["unknown"].append(item)
 
@@ -143,13 +158,15 @@ class DataMigrator:
             path_manager = DataPathManager(self.data_root, db_name)
             dest = path_manager.raw_path(sql_file.name, create_dir=False)
 
-            self.migration_plan.append({
-                "source": sql_file,
-                "dest": dest,
-                "category": "raw",
-                "database": db_name,
-                "action": "move"
-            })
+            self.migration_plan.append(
+                {
+                    "source": sql_file,
+                    "dest": dest,
+                    "category": "raw",
+                    "database": db_name,
+                    "action": "move",
+                }
+            )
 
         # Process embedding files
         for emb_file in categories["embeddings"]:
@@ -158,13 +175,15 @@ class DataMigrator:
             path_manager = DataPathManager(self.data_root, db_name)
             dest = path_manager.embeddings_path(emb_file.name, create_dir=False)
 
-            self.migration_plan.append({
-                "source": emb_file,
-                "dest": dest,
-                "category": "embeddings",
-                "database": db_name,
-                "action": "move"
-            })
+            self.migration_plan.append(
+                {
+                    "source": emb_file,
+                    "dest": dest,
+                    "category": "embeddings",
+                    "database": db_name,
+                    "action": "move",
+                }
+            )
 
         # Process graph files
         for graph_file in categories["graph"]:
@@ -172,13 +191,15 @@ class DataMigrator:
             path_manager = DataPathManager(self.data_root, db_name)
             dest = path_manager.graph_path(graph_file.name, create_dir=False)
 
-            self.migration_plan.append({
-                "source": graph_file,
-                "dest": dest,
-                "category": "graph",
-                "database": db_name,
-                "action": "move"
-            })
+            self.migration_plan.append(
+                {
+                    "source": graph_file,
+                    "dest": dest,
+                    "category": "graph",
+                    "database": db_name,
+                    "action": "move",
+                }
+            )
 
         # Process metadata files
         for meta_file in categories["metadata"]:
@@ -186,13 +207,15 @@ class DataMigrator:
             path_manager = DataPathManager(self.data_root, db_name)
             dest = path_manager.metadata_path(meta_file.name, create_dir=False)
 
-            self.migration_plan.append({
-                "source": meta_file,
-                "dest": dest,
-                "category": "metadata",
-                "database": db_name,
-                "action": "move"
-            })
+            self.migration_plan.append(
+                {
+                    "source": meta_file,
+                    "dest": dest,
+                    "category": "metadata",
+                    "database": db_name,
+                    "action": "move",
+                }
+            )
 
         # Process separated_sql directory
         for sep_dir in categories["separated_dirs"]:
@@ -204,11 +227,15 @@ class DataMigrator:
 
         # Warn about unknown files
         for unknown in categories["unknown"]:
-            self.warnings.append(f"Unknown file/directory will not be migrated: {unknown}")
+            self.warnings.append(
+                f"Unknown file/directory will not be migrated: {unknown}"
+            )
 
         return len(self.errors) == 0
 
-    def _detect_database_for_file(self, file_path: Path, raw_sql_files: List[Path]) -> str:
+    def _detect_database_for_file(
+        self, file_path: Path, raw_sql_files: List[Path]
+    ) -> str:
         """
         Detect which database a file belongs to.
 
@@ -227,13 +254,15 @@ class DataMigrator:
         for sql_file in raw_sql_files:
             db_name = detect_database_name(sql_file)
             # Check if file name contains database name
-            if db_name.replace('-', '').lower() in file_path.name.lower():
+            if db_name.replace("-", "").lower() in file_path.name.lower():
                 return db_name
 
         # Default fallback
         return "default"
 
-    def _process_separated_sql_dir(self, sep_dir: Path, raw_sql_files: List[Path]) -> None:
+    def _process_separated_sql_dir(
+        self, sep_dir: Path, raw_sql_files: List[Path]
+    ) -> None:
         """
         Process the separated_sql directory.
 
@@ -245,27 +274,31 @@ class DataMigrator:
         has_db_folders = any(
             (sep_dir / item.name).is_dir()
             for item in sep_dir.iterdir()
-            if not item.name.endswith('.json')
+            if not item.name.endswith(".json")
         )
 
         if has_db_folders:
             # Structure: separated_sql/{DatabaseName}/{object_type}/
             for db_folder in sep_dir.iterdir():
-                if db_folder.is_dir() and not db_folder.name.endswith('.json'):
+                if db_folder.is_dir() and not db_folder.name.endswith(".json"):
                     db_name = normalize_database_name(db_folder.name)
                     path_manager = DataPathManager(self.data_root, db_name)
 
                     # Move object type folders
                     for object_type_dir in db_folder.iterdir():
                         if object_type_dir.is_dir():
-                            dest = path_manager.separated_path(object_type_dir.name, create_dir=False)
-                            self.migration_plan.append({
-                                "source": object_type_dir,
-                                "dest": dest,
-                                "category": "separated",
-                                "database": db_name,
-                                "action": "move_dir"
-                            })
+                            dest = path_manager.separated_path(
+                                object_type_dir.name, create_dir=False
+                            )
+                            self.migration_plan.append(
+                                {
+                                    "source": object_type_dir,
+                                    "dest": dest,
+                                    "category": "separated",
+                                    "database": db_name,
+                                    "action": "move_dir",
+                                }
+                            )
         else:
             # Structure: separated_sql/{object_type}/ (generic)
             db_name = self._detect_database_for_file(sep_dir, raw_sql_files)
@@ -273,24 +306,30 @@ class DataMigrator:
 
             for object_type_dir in sep_dir.iterdir():
                 if object_type_dir.is_dir():
-                    dest = path_manager.separated_path(object_type_dir.name, create_dir=False)
-                    self.migration_plan.append({
-                        "source": object_type_dir,
-                        "dest": dest,
-                        "category": "separated",
-                        "database": db_name,
-                        "action": "move_dir"
-                    })
-                elif object_type_dir.name.endswith('.json'):
+                    dest = path_manager.separated_path(
+                        object_type_dir.name, create_dir=False
+                    )
+                    self.migration_plan.append(
+                        {
+                            "source": object_type_dir,
+                            "dest": dest,
+                            "category": "separated",
+                            "database": db_name,
+                            "action": "move_dir",
+                        }
+                    )
+                elif object_type_dir.name.endswith(".json"):
                     # Manifest file
                     dest = path_manager.separation_manifest_path(create_dir=False)
-                    self.migration_plan.append({
-                        "source": object_type_dir,
-                        "dest": dest,
-                        "category": "separated",
-                        "database": db_name,
-                        "action": "move"
-                    })
+                    self.migration_plan.append(
+                        {
+                            "source": object_type_dir,
+                            "dest": dest,
+                            "category": "separated",
+                            "database": db_name,
+                            "action": "move",
+                        }
+                    )
 
     def _process_raw_dir(self, raw_dir: Path, raw_sql_files: List[Path]) -> None:
         """
@@ -305,13 +344,15 @@ class DataMigrator:
             path_manager = DataPathManager(self.data_root, db_name)
             dest = path_manager.raw_path(sql_file.name, create_dir=False)
 
-            self.migration_plan.append({
-                "source": sql_file,
-                "dest": dest,
-                "category": "raw",
-                "database": db_name,
-                "action": "move"
-            })
+            self.migration_plan.append(
+                {
+                    "source": sql_file,
+                    "dest": dest,
+                    "category": "raw",
+                    "database": db_name,
+                    "action": "move",
+                }
+            )
 
     def print_migration_plan(self, dry_run: bool = True) -> None:
         """
@@ -344,9 +385,13 @@ class DataMigrator:
                 action = item["action"]
 
                 if action == "move_dir":
-                    print(f"   DIR:  {source.relative_to(self.data_root)} -> {dest.relative_to(self.data_root)}/")
+                    print(
+                        f"   DIR:  {source.relative_to(self.data_root)} -> {dest.relative_to(self.data_root)}/"
+                    )
                 else:
-                    print(f"   FILE: {source.relative_to(self.data_root)} -> {dest.relative_to(self.data_root)}")
+                    print(
+                        f"   FILE: {source.relative_to(self.data_root)} -> {dest.relative_to(self.data_root)}"
+                    )
 
         # Print warnings
         if self.warnings:
@@ -426,7 +471,9 @@ class DataMigrator:
         # Clean up empty directories
         self._cleanup_empty_dirs()
 
-        print(f"\n[OK] Migration complete: {success_count}/{len(self.migration_plan)} items migrated")
+        print(
+            f"\n[OK] Migration complete: {success_count}/{len(self.migration_plan)} items migrated"
+        )
         if self.errors:
             print(f"[ERROR] {len(self.errors)} errors occurred:")
             for error in self.errors:
@@ -438,7 +485,11 @@ class DataMigrator:
     def _cleanup_empty_dirs(self) -> None:
         """Remove empty directories after migration."""
         for item in self.data_root.iterdir():
-            if item.is_dir() and item.name not in [".cache", ".git"] and not item.name.startswith('.'):
+            if (
+                item.is_dir()
+                and item.name not in [".cache", ".git"]
+                and not item.name.startswith(".")
+            ):
                 try:
                     if not any(item.rglob("*")):
                         item.rmdir()
@@ -479,9 +530,16 @@ class DataMigrator:
         for item in self.data_root.iterdir():
             if item.is_file() and item.name != "README.md":
                 root_files.append(item)
-            elif item.is_dir() and item.name not in [".cache"] and not item.name.startswith('.'):
+            elif (
+                item.is_dir()
+                and item.name not in [".cache"]
+                and not item.name.startswith(".")
+            ):
                 # Check if it's a database folder (has expected subdirectories)
-                has_structure = any((item / cat).exists() for cat in ["raw", "separated", "embeddings", "graph", "metadata"])
+                has_structure = any(
+                    (item / cat).exists()
+                    for cat in ["raw", "separated", "embeddings", "graph", "metadata"]
+                )
                 if not has_structure:
                     root_files.append(item)
 
@@ -504,39 +562,29 @@ def main():
         "--data-root",
         type=Path,
         default=Path("./data"),
-        help="Root data directory (default: ./data)"
+        help="Root data directory (default: ./data)",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would be migrated without actually moving files"
+        help="Show what would be migrated without actually moving files",
     )
-    parser.add_argument(
-        "--execute",
-        action="store_true",
-        help="Execute the migration"
-    )
+    parser.add_argument("--execute", action="store_true", help="Execute the migration")
     parser.add_argument(
         "--backup",
         action="store_true",
         default=True,
-        help="Create backup before migration (default: True)"
+        help="Create backup before migration (default: True)",
     )
     parser.add_argument(
-        "--no-backup",
-        action="store_true",
-        help="Skip backup (not recommended)"
+        "--no-backup", action="store_true", help="Skip backup (not recommended)"
     )
     parser.add_argument(
         "--validate",
         action="store_true",
-        help="Validate that migration completed successfully"
+        help="Validate that migration completed successfully",
     )
-    parser.add_argument(
-        "--rollback",
-        type=Path,
-        help="Rollback from a backup file"
-    )
+    parser.add_argument("--rollback", type=Path, help="Rollback from a backup file")
 
     args = parser.parse_args()
 

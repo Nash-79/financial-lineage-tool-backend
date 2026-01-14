@@ -37,12 +37,12 @@ This document summarizes the implementation of the OpenSpec proposal to dockeriz
 ### 1. Docker Infrastructure ✅
 
 **Files Created/Modified**:
-- [docker-compose.local.yml](docker-compose.local.yml)
-- [docker-compose.prod.yml](docker-compose.prod.yml)
-- [docker-compose.neo4j.yml](docker-compose.neo4j.yml)
-- [Dockerfile.local](Dockerfile.local)
-- [.dockerignore](.dockerignore)
-- [.env.example](.env.example)
+- [docker-compose.yml](../../docker-compose.yml)
+- [docker-compose.prod.yml](../../docker-compose.prod.yml)
+- [docker-compose.neo4j.yml](../../docker-compose.neo4j.yml)
+- [Dockerfile.local](../../Dockerfile.local)
+- [.dockerignore](../../.dockerignore)
+- [.env.example](../../.env.example)
 
 **Features**:
 - Multi-service orchestration (API, Qdrant, Redis, Neo4j)
@@ -61,7 +61,7 @@ This document summarizes the implementation of the OpenSpec proposal to dockeriz
 
 ### 2. LlamaIndex RAG Service ✅
 
-**File**: [src/llm/llamaindex_service.py](src/llm/llamaindex_service.py)
+**File**: [src/llm/llamaindex_service.py](../../src/llm/llamaindex_service.py)
 
 **Capabilities**:
 - Document indexing with semantic chunking
@@ -80,7 +80,7 @@ metrics = service.get_metrics()  # Performance stats
 
 ### 3. REST API Endpoints ✅
 
-**File**: [src/api/main_local.py](src/api/main_local.py)
+**File**: [src/api/main_local.py](../../src/api/main_local.py)
 
 **New Endpoints**:
 
@@ -122,16 +122,16 @@ class RAGStatusResponse(BaseModel):
 ### 4. Startup Scripts ✅
 
 **Windows Scripts**:
-- [check-docker.bat](check-docker.bat) - Validation
-- [start-docker.bat](start-docker.bat) - Start services
-- [stop-docker.bat](stop-docker.bat) - Stop services
-- [logs-docker.bat](logs-docker.bat) - View logs
+- [check-docker.bat](../../check-docker.bat) - Validation
+- [start-docker.bat](../../start-docker.bat) - Start services
+- [stop-docker.bat](../../stop-docker.bat) - Stop services
+- [logs-docker.bat](../../logs-docker.bat) - View logs
 
 **Unix Scripts**:
-- [check-docker.sh](check-docker.sh) - Validation
-- [start-docker.sh](start-docker.sh) - Start services
-- [stop-docker.sh](stop-docker.sh) - Stop services
-- [logs-docker.sh](logs-docker.sh) - View logs
+- [check-docker.sh](../../check-docker.sh) - Validation
+- [start-docker.sh](../../start-docker.sh) - Start services
+- [stop-docker.sh](../../stop-docker.sh) - Stop services
+- [logs-docker.sh](../../logs-docker.sh) - View logs
 
 **Features**:
 - Ollama availability check
@@ -141,7 +141,7 @@ class RAGStatusResponse(BaseModel):
 
 ### 5. Testing Infrastructure ✅
 
-**File**: [tests/test_api_endpoints.py](tests/test_api_endpoints.py)
+**File**: [tests/test_api_endpoints.py](../../tests/test_api_endpoints.py)
 
 **Test Coverage**:
 - Health endpoint tests
@@ -170,9 +170,9 @@ class TestIntegration
 ### 6. Documentation ✅
 
 **Files Created**:
-- [README.md](README.md) - Docker-first quick start
-- [docs/DOCKER_SETUP.md](docs/DOCKER_SETUP.md) - Complete deployment guide
-- [docs/LLAMAINDEX_RAG.md](docs/LLAMAINDEX_RAG.md) - RAG pipeline documentation
+- [README.md](../../README.md) - Docker-first quick start
+- [docs/setup/DOCKER_SETUP.md](../setup/DOCKER_SETUP.md) - Complete deployment guide
+- [docs/architecture/LLAMAINDEX_RAG.md](../architecture/LLAMAINDEX_RAG.md) - RAG pipeline documentation
 
 **README.md Coverage**:
 - Quick start (Docker)
@@ -204,7 +204,7 @@ class TestIntegration
 
 ### 7. Configuration Management ✅
 
-**File**: [.env.example](.env.example)
+**File**: [.env.example](../../.env.example)
 
 **Configuration Categories**:
 
@@ -213,7 +213,6 @@ class TestIntegration
 USE_LLAMAINDEX=true
 SIMILARITY_THRESHOLD=0.7
 SIMILARITY_TOP_K=5
-RESPONSE_MODE=compact
 ```
 
 #### Ollama Settings
@@ -325,7 +324,7 @@ start-docker.bat  # Windows
 
 ```bash
 # Check all services are healthy
-docker compose -f docker-compose.local.yml ps
+docker compose -f docker-compose.yml ps
 
 # View logs
 logs-docker.bat  # Windows
@@ -433,7 +432,7 @@ This allows instant rollback by changing the environment variable.
 **Backup**:
 ```bash
 # Backup Qdrant data
-docker compose -f docker-compose.local.yml exec qdrant \
+docker compose -f docker-compose.yml exec qdrant \
   tar czf /tmp/qdrant-backup.tar.gz /qdrant/storage
 
 docker cp <container_id>:/tmp/qdrant-backup.tar.gz ./backups/
@@ -454,7 +453,7 @@ docker cp <container_id>:/tmp/qdrant-backup.tar.gz ./backups/
 python -m pytest tests/test_api_endpoints.py -v
 
 # Run in Docker
-docker compose -f docker-compose.local.yml exec api \
+docker compose -f docker-compose.yml exec api \
   python -m pytest tests/test_api_endpoints.py -v
 
 # Test specific endpoint
@@ -536,7 +535,7 @@ pytest-asyncio>=0.21.0
 ### Created Files (35)
 
 **Docker**:
-- docker-compose.local.yml
+- docker-compose.yml
 - docker-compose.prod.yml
 - docker-compose.neo4j.yml
 - Dockerfile.local
@@ -556,8 +555,8 @@ pytest-asyncio>=0.21.0
 
 **Documentation**:
 - README.md (rewritten, 157 lines)
-- docs/DOCKER_SETUP.md (new, 300+ lines)
-- docs/LLAMAINDEX_RAG.md (new, 488 lines)
+- docs/setup/DOCKER_SETUP.md (new, 300+ lines)
+- docs/architecture/LLAMAINDEX_RAG.md (new, 488 lines)
 - IMPLEMENTATION_SUMMARY.md (this file)
 
 **Configuration**:
@@ -582,7 +581,7 @@ If you need to revert to the previous version:
 stop-docker.bat
 
 # 2. Remove containers and volumes
-docker compose -f docker-compose.local.yml down -v
+docker compose -f docker-compose.yml down -v
 
 # 3. Checkout previous commit
 git checkout <previous-commit-hash>

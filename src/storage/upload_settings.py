@@ -59,7 +59,7 @@ class UploadSettingsStore:
         self,
         allowed_extensions: List[str],
         max_file_size_mb: int,
-        updated_by: str = "api"
+        updated_by: str = "api",
     ) -> bool:
         """
         Save upload settings to database.
@@ -82,7 +82,9 @@ class UploadSettingsStore:
 
             # Upsert settings (single row with id='default')
             # First, check if row exists
-            existing = self.db.fetchone("SELECT id FROM upload_settings WHERE id = 'default'")
+            existing = self.db.fetchone(
+                "SELECT id FROM upload_settings WHERE id = 'default'"
+            )
 
             if existing:
                 # Update existing row
@@ -95,7 +97,7 @@ class UploadSettingsStore:
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = 'default'
                     """,
-                    (extensions_json, max_file_size_mb, updated_by)
+                    (extensions_json, max_file_size_mb, updated_by),
                 )
             else:
                 # Insert new row
@@ -104,10 +106,12 @@ class UploadSettingsStore:
                     INSERT INTO upload_settings (id, allowed_extensions, max_file_size_mb, updated_by)
                     VALUES ('default', ?, ?, ?)
                     """,
-                    (extensions_json, max_file_size_mb, updated_by)
+                    (extensions_json, max_file_size_mb, updated_by),
                 )
 
-            logger.info(f"Saved upload settings: extensions={allowed_extensions}, max_size={max_file_size_mb}MB, by={updated_by}")
+            logger.info(
+                f"Saved upload settings: extensions={allowed_extensions}, max_size={max_file_size_mb}MB, by={updated_by}"
+            )
             return True
 
         except Exception as e:
@@ -129,7 +133,9 @@ class UploadSettingsStore:
             return settings
 
         # No settings in DB: initialize from environment variables
-        logger.info("No upload settings in database, initializing from environment variables")
+        logger.info(
+            "No upload settings in database, initializing from environment variables"
+        )
 
         default_extensions = config.ALLOWED_FILE_EXTENSIONS
         default_size = config.UPLOAD_MAX_FILE_SIZE_MB
@@ -138,7 +144,7 @@ class UploadSettingsStore:
         success = await self.save_settings(
             allowed_extensions=default_extensions,
             max_file_size_mb=default_size,
-            updated_by="system"
+            updated_by="system",
         )
 
         if not success:

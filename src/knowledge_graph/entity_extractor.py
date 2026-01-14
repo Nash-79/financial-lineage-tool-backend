@@ -5,8 +5,9 @@ format, then ingesting it into Neo4j.
 """
 
 from ..ingestion.code_parser import CodeParser
+from ..ingestion.plugins.base import LineageResult
+from ..utils.urn import generate_urn, normalize_asset_path
 from .neo4j_client import Neo4jGraphClient
-import hashlib
 import json
 import os
 import logging
@@ -46,12 +47,17 @@ class GraphExtractor:
         self._entity_batch: List[Dict[str, Any]] = []
         self._relationship_batch: List[Dict[str, Any]] = []
 
-    def _generate_id(self, *parts):
-        """Creates a deterministic ID from a set of parts."""
-        m = hashlib.sha256()
-        for part in parts:
-            m.update(str(part).encode("utf-8"))
-        return m.hexdigest()
+    def _generate_id(
+        self,
+        entity_type: str,
+        *parts: str,
+        project_id: Optional[str] = None,
+    ) -> str:
+        """Create a URN-based identifier for graph nodes."""
+        resolved_project = project_id or "default"
+        asset_path = "/".join(str(part) for part in parts if part)
+        normalized_path = normalize_asset_path(asset_path)
+        return generate_urn(entity_type, resolved_project, normalized_path)
 
     def _add_entity_to_batch(self, entity_id: str, entity_type: str, **properties):
         """
@@ -96,7 +102,7 @@ class GraphExtractor:
         }
         # Merge with any additional properties
         merged_properties = {**metadata, **properties}
-        
+
         rel_data = {
             "source_id": source_id,
             "target_id": target_id,
@@ -115,9 +121,152 @@ class GraphExtractor:
                 source_id, target_id, relationship_type, **merged_properties
             )
 
+    def ingest_lineage_result(
+        self,
+        result: LineageResult,
+        *,
+        project_id: Optional[str] = None,
+        repository_id: Optional[str] = None,
+        source_file: Optional[str] = None,
+        source: Optional[str] = None,
+        source_repo: Optional[str] = None,
+    ) -> int:
+        """Ingest standardized lineage results into Neo4j."""
+        common_properties: Dict[str, Any] = {
+            "project_id": project_id,
+            "repository_id": repository_id,
+            "source_file": source_file,
+        }
+        if source:
+            common_properties["source"] = source
+        if source_repo:
+            common_properties["source_repo"] = source_repo
+
+        node_ids: Dict[tuple[str, str], str] = {}
+        fallback_ids: Dict[str, str] = {}
+        nodes_created = 0
+
+        def register_node(
+            label: str,
+            name: str,
+            subtype: Optional[str] = None,
+            properties: Optional[Dict[str, Any]] = None,
+        ) -> str:
+            nonlocal nodes_created
+            node_key = (label, name)
+            if node_key in node_ids:
+                return node_ids[node_key]
+
+            merged = {**common_properties}
+            merged.update(properties or {})
+            merged.setdefault("name", name)
+            if subtype:
+                merged.setdefault("subtype", subtype)
+            merged = {key: value for key, value in merged.items() if value is not None}
+
+            entity_id = self._generate_id(label, name, project_id=project_id)
+            self._add_entity_to_batch(
+                entity_id=entity_id,
+                entity_type=label,
+                **merged,
+            )
+            node_ids[node_key] = entity_id
+            fallback_ids.setdefault(name, entity_id)
+            nodes_created += 1
+            return entity_id
+
+        for node in result.nodes:
+            register_node(node.label, node.name, node.type, node.properties)
+
+        for external in result.external_refs:
+            register_node(
+                "DataAsset",
+                external,
+                "Table",
+                {"external_ref": True, "name": external},
+            )
+
+        for edge in result.edges:
+            source_label = (
+                edge.properties.get("source_label") if edge.properties else None
+            )
+            target_label = (
+                edge.properties.get("target_label") if edge.properties else None
+            )
+
+            if source_label:
+                source_id = node_ids.get((source_label, edge.source))
+            else:
+                source_id = fallback_ids.get(edge.source)
+            if target_label:
+                target_id = node_ids.get((target_label, edge.target))
+            else:
+                target_id = fallback_ids.get(edge.target)
+
+            if not source_id:
+                source_id = register_node(
+                    "DataAsset",
+                    edge.source,
+                    "Table",
+                    {"external_ref": True, "name": edge.source},
+                )
+            if not target_id:
+                target_id = register_node(
+                    "DataAsset",
+                    edge.target,
+                    "Table",
+                    {"external_ref": True, "name": edge.target},
+                )
+
+            edge_properties = {
+                key: value
+                for key, value in (edge.properties or {}).items()
+                if key not in {"source_label", "target_label"}
+            }
+            edge_properties.update(
+                {
+                    key: value
+                    for key, value in common_properties.items()
+                    if value is not None
+                }
+            )
+            if source:
+                edge_properties["source"] = source
+            if source_repo:
+                edge_properties["source_repo"] = source_repo
+            self._add_relationship_to_batch(
+                source_id,
+                target_id,
+                edge.relationship,
+                **edge_properties,
+            )
+
+        enrichments = result.metadata.get("enrichments", []) if result.metadata else []
+        for enrichment in enrichments:
+            name = enrichment.get("name")
+            properties = enrichment.get("properties", {})
+            if not name or not properties:
+                continue
+            try:
+                query = """
+                MATCH (n)
+                WHERE toLower(n.name) = toLower($name)
+                   OR toLower(n.name) ENDS WITH toLower($name)
+                SET n += $properties
+                RETURN count(n) as updated
+                """
+                self.client._execute_query(
+                    query,
+                    {"name": name, "properties": properties},
+                )
+            except Exception as exc:
+                logger.warning("Failed to apply enrichment for %s: %s", name, exc)
+
+        return nodes_created
+
     def _flush_entities(self):
         """Flush accumulated entities to Neo4j using batch operations.
-        
+
         Groups entities by entity_type to ensure homogeneous batches,
         as batch_create_entities uses the first entity's type for all.
         """
@@ -130,11 +279,12 @@ class GraphExtractor:
         try:
             # Group entities by type to ensure homogeneous batches
             from collections import defaultdict
+
             by_type = defaultdict(list)
             for entity in self._entity_batch:
                 entity_type = entity.get("entity_type", "Node")
                 by_type[entity_type].append(entity)
-            
+
             total_created = 0
             for entity_type, entities in by_type.items():
                 logger.debug(f"Flushing {len(entities)} {entity_type} entities")
@@ -142,7 +292,7 @@ class GraphExtractor:
                     entities=entities, batch_size=self.batch_size
                 )
                 total_created += created
-            
+
             logger.info(f"Successfully flushed {total_created}/{count} entities")
         except Exception as e:
             logger.error(f"Failed to flush entities: {e}")
@@ -153,7 +303,7 @@ class GraphExtractor:
 
     def _flush_relationships(self):
         """Flush accumulated relationships to Neo4j using batch operations.
-        
+
         Groups relationships by relationship_type to ensure homogeneous batches,
         as batch_create_relationships uses the first relationship's type for all.
         """
@@ -166,11 +316,12 @@ class GraphExtractor:
         try:
             # Group relationships by type to ensure homogeneous batches
             from collections import defaultdict
+
             by_type = defaultdict(list)
             for rel in self._relationship_batch:
                 rel_type = rel.get("relationship_type", "RELATED_TO")
                 by_type[rel_type].append(rel)
-            
+
             total_created = 0
             for rel_type, relationships in by_type.items():
                 logger.debug(f"Flushing {len(relationships)} {rel_type} relationships")
@@ -178,7 +329,7 @@ class GraphExtractor:
                     relationships=relationships, batch_size=self.batch_size
                 )
                 total_created += created
-            
+
             logger.info(f"Successfully flushed {total_created}/{count} relationships")
         except Exception as e:
             logger.error(f"Failed to flush relationships: {e}")
@@ -254,7 +405,11 @@ class GraphExtractor:
         # 1. Ingest Data Assets (Tables, Views)
         write_asset_id = None
         if parsed_data.get("write") and parsed_data["write"] != "console":
-            write_asset_id = self._generate_id("data_asset", parsed_data["write"])
+            write_asset_id = self._generate_id(
+                "data_asset",
+                parsed_data["write"],
+                project_id=project_id,
+            )
             asset_type = (
                 "View"
                 if parsed_data["write"] in parsed_data.get("views", [])
@@ -268,7 +423,11 @@ class GraphExtractor:
 
         read_asset_ids = {}
         for asset_name in parsed_data.get("read", []):
-            asset_id = self._generate_id("data_asset", asset_name)
+            asset_id = self._generate_id(
+                "data_asset",
+                asset_name,
+                project_id=project_id,
+            )
             read_asset_ids[asset_name] = asset_id
             add_entity(
                 entity_id=asset_id,
@@ -281,9 +440,9 @@ class GraphExtractor:
             # Determine relationship type (Target DEPENDS_ON Source)
             is_mv = parsed_data["write"] in parsed_data.get("materialized_views", [])
             is_view = parsed_data["write"] in parsed_data.get("views", [])
-            
+
             rel_type = "DERIVES" if (is_mv or is_view) else "READS_FROM"
-            
+
             for source_id in read_asset_ids.values():
                 self._add_relationship_to_batch(write_asset_id, source_id, rel_type)
 
@@ -296,7 +455,10 @@ class GraphExtractor:
                 continue
 
             target_col_id = self._generate_id(
-                "column", parsed_data["write"], target_col_name
+                "column",
+                parsed_data["write"],
+                target_col_name,
+                project_id=project_id,
             )
             add_entity(
                 entity_id=target_col_id, entity_type="Column", name=target_col_name
@@ -307,7 +469,10 @@ class GraphExtractor:
             # Create transformation node
             transformation_logic = col_lineage["transformation"]
             trans_id = self._generate_id(
-                "transformation", transformation_logic, target_col_id
+                "transformation",
+                transformation_logic,
+                target_col_id,
+                project_id=project_id,
             )
             add_entity(
                 entity_id=trans_id,
@@ -327,7 +492,11 @@ class GraphExtractor:
                 source_asset_id = read_asset_ids.get(source_table_name)
                 if not source_asset_id:
                     # If the source asset wasn't in the main "read" list, add it now
-                    source_asset_id = self._generate_id("data_asset", source_table_name)
+                    source_asset_id = self._generate_id(
+                        "data_asset",
+                        source_table_name,
+                        project_id=project_id,
+                    )
                     add_entity(
                         entity_id=source_asset_id,
                         entity_type="DataAsset",
@@ -336,7 +505,10 @@ class GraphExtractor:
                     read_asset_ids[source_table_name] = source_asset_id
 
                 source_col_id = self._generate_id(
-                    "column", source_table_name, source_col_name
+                    "column",
+                    source_table_name,
+                    source_col_name,
+                    project_id=project_id,
                 )
                 add_entity(
                     entity_id=source_col_id, entity_type="Column", name=source_col_name
@@ -348,7 +520,11 @@ class GraphExtractor:
 
         # 3. Ingest Functions and Procedures
         for func_name in parsed_data.get("functions_and_procedures", []):
-            func_id = self._generate_id("function", func_name)
+            func_id = self._generate_id(
+                "function",
+                func_name,
+                project_id=project_id,
+            )
             add_entity(
                 entity_id=func_id,
                 entity_type="FunctionOrProcedure",
@@ -359,36 +535,52 @@ class GraphExtractor:
         for trigger_data in parsed_data.get("triggers", []):
             trigger_name = trigger_data.get("name")
             target_table = trigger_data.get("target_table")
-            
-            trigger_id = self._generate_id("trigger", trigger_name)
+
+            trigger_id = self._generate_id(
+                "trigger",
+                trigger_name,
+                project_id=project_id,
+            )
             add_entity(
                 entity_id=trigger_id,
                 entity_type="Trigger",
                 name=trigger_name,
             )
-            
+
             if target_table:
-                target_id = self._generate_id("data_asset", target_table)
+                target_id = self._generate_id(
+                    "data_asset",
+                    target_table,
+                    project_id=project_id,
+                )
                 # Ensure target node exists (might differ from general read/write assets)
                 add_entity(
                     entity_id=target_id, entity_type="DataAsset", name=target_table
                 )
                 self._add_relationship_to_batch(trigger_id, target_id, "ATTACHED_TO")
 
-        # 5. Ingest Synonyms  
+        # 5. Ingest Synonyms
         for synonym_data in parsed_data.get("synonyms", []):
             synonym_name = synonym_data.get("name")
             target_obj = synonym_data.get("target_object")
-            
-            synonym_id = self._generate_id("synonym", synonym_name)
+
+            synonym_id = self._generate_id(
+                "synonym",
+                synonym_name,
+                project_id=project_id,
+            )
             add_entity(
                 entity_id=synonym_id,
                 entity_type="Synonym",
                 name=synonym_name,
             )
-            
+
             if target_obj:
-                target_id = self._generate_id("data_asset", target_obj)
+                target_id = self._generate_id(
+                    "data_asset",
+                    target_obj,
+                    project_id=project_id,
+                )
                 add_entity(
                     entity_id=target_id, entity_type="DataAsset", name=target_obj
                 )
@@ -396,7 +588,11 @@ class GraphExtractor:
 
         # 6. Ingest Materialized Views
         for mv_name in parsed_data.get("materialized_views", []):
-            mv_id = self._generate_id("materialized_view", mv_name)
+            mv_id = self._generate_id(
+                "materialized_view",
+                mv_name,
+                project_id=project_id,
+            )
             add_entity(
                 entity_id=mv_id,
                 entity_type="MaterializedView",
@@ -408,9 +604,13 @@ class GraphExtractor:
             proc_name = proc_call.get("name")
             if not proc_name:
                 continue
-            
+
             # Create or reference the procedure being called
-            called_proc_id = self._generate_id("procedure", proc_name)
+            called_proc_id = self._generate_id(
+                "procedure",
+                proc_name,
+                project_id=project_id,
+            )
             add_entity(
                 entity_id=called_proc_id,
                 entity_type="FunctionOrProcedure",
@@ -419,17 +619,18 @@ class GraphExtractor:
 
             # Link call
             # If the SQL defines a procedure, assume it makes the call
-            is_proc_def = write_asset_id and parsed_data["write"] in parsed_data.get("functions_and_procedures", [])
+            is_proc_def = write_asset_id and parsed_data["write"] in parsed_data.get(
+                "functions_and_procedures", []
+            )
             call_source = write_asset_id if is_proc_def else file_node_id
-            
+
             if call_source:
                 self._add_relationship_to_batch(call_source, called_proc_id, "CALLS")
-
 
         print(f"Successfully ingested lineage from {source_file}.")
         return nodes_created
 
-    def ingest_file(self, file_path: str):
+    def ingest_file(self, file_path: str, project_id: Optional[str] = None):
         """
         Ingests a file based on its extension.
 
@@ -444,7 +645,11 @@ class GraphExtractor:
         ext = os.path.splitext(filename)[1].lower()
 
         # Create File Node
-        file_id = self._generate_id("file", file_path)
+        file_id = self._generate_id(
+            "file",
+            file_path,
+            project_id=project_id,
+        )
         self._add_entity_to_batch(
             entity_id=file_id,
             entity_type="File",
@@ -461,15 +666,30 @@ class GraphExtractor:
                 print(f"[*] Ingesting SQL: {filename}")
                 # Use existing logic, but maybe we can link assets to this file node?
                 # For now, just call the existing method.
-                self.ingest_sql_lineage(content, source_file=filename, file_node_id=file_id)
+                self.ingest_sql_lineage(
+                    content,
+                    source_file=filename,
+                    file_node_id=file_id,
+                    project_id=project_id,
+                )
 
             elif ext == ".py":
                 print(f"[*] Ingesting Python: {filename}")
-                self.ingest_python(content, source_file=filename, file_node_id=file_id)
+                self.ingest_python(
+                    content,
+                    source_file=filename,
+                    file_node_id=file_id,
+                    project_id=project_id,
+                )
 
             elif ext == ".json":
                 print(f"[*] Ingesting JSON: {filename}")
-                self.ingest_json(content, source_file=filename, file_node_id=file_id)
+                self.ingest_json(
+                    content,
+                    source_file=filename,
+                    file_node_id=file_id,
+                    project_id=project_id,
+                )
 
             else:
                 print(f"[i] Skipping unsupported file type: {ext}")
@@ -477,7 +697,13 @@ class GraphExtractor:
         except Exception as e:
             print(f"[!] Error processing {file_path}: {e}")
 
-    def ingest_python(self, content: str, source_file: str, file_node_id: str = None):
+    def ingest_python(
+        self,
+        content: str,
+        source_file: str,
+        file_node_id: str = None,
+        project_id: Optional[str] = None,
+    ):
         """Ingest Python structure."""
         parsed = self.parser.parse_python(content)
         if not parsed:
@@ -485,7 +711,12 @@ class GraphExtractor:
 
         # Ingest Classes
         for cls in parsed["classes"]:
-            cls_id = self._generate_id("class", cls["name"], source_file)
+            cls_id = self._generate_id(
+                "class",
+                cls["name"],
+                source_file,
+                project_id=project_id,
+            )
             self._add_entity_to_batch(
                 entity_id=cls_id,
                 entity_type="Class",
@@ -503,7 +734,12 @@ class GraphExtractor:
 
         # Ingest Functions
         for func in parsed["functions"]:
-            func_id = self._generate_id("function", func["name"], source_file)
+            func_id = self._generate_id(
+                "function",
+                func["name"],
+                source_file,
+                project_id=project_id,
+            )
             self._add_entity_to_batch(
                 entity_id=func_id,
                 entity_type="Function",
@@ -517,14 +753,22 @@ class GraphExtractor:
         # Ingest Imports
         for imp in parsed["imports"]:
             # Maybe link to a Module node
-            mod_id = self._generate_id("module", imp)
+            mod_id = self._generate_id(
+                "module",
+                imp,
+                project_id=project_id,
+            )
             self._add_entity_to_batch(entity_id=mod_id, entity_type="Module", name=imp)
             if file_node_id:
                 self._add_relationship_to_batch(file_node_id, mod_id, "IMPORTS")
-        
+
         # Ingest Heuristic Table References (Python -> SQL lineage)
         for table_ref in parsed.get("table_references", []):
-            table_id = self._generate_id("data_asset", table_ref)
+            table_id = self._generate_id(
+                "data_asset",
+                table_ref,
+                project_id=project_id,
+            )
             self._add_entity_to_batch(
                 entity_id=table_id,
                 entity_type="DataAsset",
@@ -533,17 +777,29 @@ class GraphExtractor:
             # Create READS_FROM edge from file to table (heuristic)
             if file_node_id:
                 self._add_relationship_to_batch(
-                    file_node_id, table_id, "READS_FROM",
-                    evidence=f"Heuristic extraction from Python code in {source_file}"
+                    file_node_id,
+                    table_id,
+                    "READS_FROM",
+                    evidence=f"Heuristic extraction from Python code in {source_file}",
                 )
 
-    def ingest_json(self, content: str, source_file: str, file_node_id: str = None):
+    def ingest_json(
+        self,
+        content: str,
+        source_file: str,
+        file_node_id: str = None,
+        project_id: Optional[str] = None,
+    ):
         """Ingest JSON structure."""
         parsed = self.parser.parse_json(content)
         if not parsed:
             return
 
-        json_id = self._generate_id("json_doc", source_file)
+        json_id = self._generate_id(
+            "json_doc",
+            source_file,
+            project_id=project_id,
+        )
         self._add_entity_to_batch(
             entity_id=json_id,
             entity_type="JsonDocument",
@@ -557,7 +813,12 @@ class GraphExtractor:
 
         # Add keys as nodes if dict
         for key in parsed["keys"]:
-            key_id = self._generate_id("json_key", source_file, key)
+            key_id = self._generate_id(
+                "json_key",
+                source_file,
+                key,
+                project_id=project_id,
+            )
             self._add_entity_to_batch(entity_id=key_id, entity_type="JsonKey", name=key)
             self._add_relationship_to_batch(json_id, key_id, "HAS_KEY")
 

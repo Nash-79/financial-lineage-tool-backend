@@ -1,12 +1,14 @@
 """
 Test Neo4j connection and basic operations.
 """
+
 import os
 from dotenv import load_dotenv
 from src.knowledge_graph.neo4j_client import Neo4jGraphClient
 
 # Load environment variables
 load_dotenv()
+
 
 def test_neo4j():
     """Test Neo4j connection and operations."""
@@ -26,10 +28,7 @@ def test_neo4j():
     try:
         # Create client
         client = Neo4jGraphClient(
-            uri=uri,
-            username=username,
-            password=password,
-            database=database
+            uri=uri, username=username, password=password, database=database
         )
 
         print("[+] Successfully connected to Neo4j!")
@@ -50,7 +49,7 @@ def test_neo4j():
             entity_type="Table",
             name="customers",
             database="production",
-            schema="public"
+            schema="public",
         )
         print("[+] Added 'customers' table")
 
@@ -59,7 +58,7 @@ def test_neo4j():
             entity_type="Table",
             name="orders",
             database="production",
-            schema="public"
+            schema="public",
         )
         print("[+] Added 'orders' table")
 
@@ -67,7 +66,7 @@ def test_neo4j():
             entity_id="test_column_customer_id",
             entity_type="Column",
             name="customer_id",
-            data_type="INTEGER"
+            data_type="INTEGER",
         )
         print("[+] Added 'customer_id' column")
 
@@ -78,7 +77,7 @@ def test_neo4j():
             source_id="test_table_customers",
             target_id="test_column_customer_id",
             relationship_type="CONTAINS",
-            position=1
+            position=1,
         )
         print("[+] Added CONTAINS relationship")
 
@@ -86,7 +85,7 @@ def test_neo4j():
             source_id="test_table_orders",
             target_id="test_table_customers",
             relationship_type="DERIVES_FROM",
-            transformation="JOIN ON customer_id"
+            transformation="JOIN ON customer_id",
         )
         print("[+] Added DERIVES_FROM relationship")
 
@@ -113,7 +112,9 @@ def test_neo4j():
         upstream = client.get_upstream("test_table_orders", max_depth=5)
         print(f"[+] Found {len(upstream)} upstream relationships")
         for rel in upstream[:3]:  # Show first 3
-            print(f"    - {rel.get('source')} -> {rel.get('target')} ({rel.get('relationship')})")
+            print(
+                f"    - {rel.get('source')} -> {rel.get('target')} ({rel.get('relationship')})"
+            )
 
         # Get final stats
         print("\n[*] Final graph stats:")
@@ -130,6 +131,7 @@ def test_neo4j():
     except Exception as e:
         print(f"\n[!] Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

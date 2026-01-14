@@ -13,6 +13,7 @@ def client():
     """Create test client."""
     # Import here to avoid issues with module loading
     from src.api.main_local import app
+
     return TestClient(app)
 
 
@@ -102,6 +103,30 @@ class TestLineageEndpoints:
         # May return 404 for non-existent node, or 500/503 for service issues
         assert response.status_code in [200, 404, 500, 503]
 
+    def test_lineage_edges_filters_endpoint(self, client):
+        """Lineage edges endpoint should accept filter parameters."""
+        response = client.get(
+            "/api/v1/lineage/edges?status=approved&min_confidence=0.5&source=parser"
+        )
+        assert response.status_code in [200, 503]
+
+    def test_lineage_review_endpoint(self, client):
+        """Lineage review endpoint should exist."""
+        payload = {
+            "source_id": "test-source",
+            "target_id": "test-target",
+            "relationship_type": "READS_FROM",
+            "action": "approve",
+        }
+        response = client.post("/api/v1/lineage/review", json=payload)
+        assert response.status_code in [200, 503]
+
+    def test_lineage_infer_endpoint(self, client):
+        """Lineage inference endpoint should exist."""
+        payload = {"scope": "test-scope"}
+        response = client.post("/api/v1/lineage/infer", json=payload)
+        assert response.status_code in [200, 503]
+
 
 class TestFileEndpoints:
     """Test file endpoints."""
@@ -127,6 +152,15 @@ class TestFileEndpoints:
         """File search endpoint should exist."""
         response = client.get("/api/v1/files/search?q=test")
         assert response.status_code == 200
+
+
+class TestQdrantEndpoints:
+    """Test Qdrant lookup endpoints."""
+
+    def test_qdrant_chunk_lookup_endpoint(self, client):
+        """Qdrant chunk lookup endpoint should exist."""
+        response = client.get("/api/v1/qdrant/chunks/123")
+        assert response.status_code in [200, 404, 503]
 
 
 class TestDatabaseEndpoints:
@@ -206,9 +240,9 @@ class TestIntegration:
             pytest.skip("Services not available")
 
         # Try chat endpoint
-        response = client.post("/api/chat/text", json={
-            "query": "What is data lineage?"
-        })
+        response = client.post(
+            "/api/chat/text", json={"query": "What is data lineage?"}
+        )
 
         if response.status_code == 200:
             data = response.json()

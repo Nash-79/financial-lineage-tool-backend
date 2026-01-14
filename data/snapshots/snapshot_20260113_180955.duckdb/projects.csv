@@ -1,0 +1,7 @@
+id,name,description,created_at,updated_at,context,context_file_path
+default,Default Project,Auto-created for backward compatibility. Endpoints without project_id use this project.,2026-01-09 21:48:41.440141,2026-01-09 21:48:41.440141,,
+5845d86d-6844-4548-939a-75bacbea0fec,Test Project for Snapshot,Testing snapshot creation,2026-01-09 22:04:00.282872,2026-01-09 22:04:00.282872,,
+c6bd8d9a-ddbe-451c-9fc0-c9f0e7c3673d,Test Snapshot Logging,Verifying enhanced logs,2026-01-09 22:13:02.914864,2026-01-09 22:13:02.914864,,
+a8d4873b-0075-402b-a3e7-e059db7e1925,Snapshot Test E2E,Trigger snapshot creation test,2026-01-10 12:13:10.342231,2026-01-10 12:13:10.342231,,
+1a4267c0-d375-4164-81b4-53a2b432f680,LineageTest1,,2026-01-10 22:27:57.948058,2026-01-10 22:27:57.948058,,
+8ae9366d-a5da-44a3-a0d0-c0d2355b9b97,InvestmentData,Multi-hop SQL lineage demo: Postgres → Python → SQL Server,2026-01-12 14:26:19.347662,2026-01-12 14:26:19.347662,,

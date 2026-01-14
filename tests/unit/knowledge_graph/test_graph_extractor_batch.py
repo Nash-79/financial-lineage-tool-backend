@@ -1,7 +1,7 @@
 """Unit tests for GraphExtractor batch operations."""
 
 import unittest
-from unittest.mock import Mock, MagicMock, patch, call
+from unittest.mock import Mock
 from src.knowledge_graph.entity_extractor import GraphExtractor
 from src.knowledge_graph.neo4j_client import Neo4jGraphClient
 from src.ingestion.code_parser import CodeParser
@@ -25,7 +25,7 @@ class TestGraphExtractorBatch(unittest.TestCase):
             neo4j_client=self.mock_client,
             code_parser=self.mock_parser,
             enable_batching=True,
-            batch_size=3  # Small batch size for testing
+            batch_size=3,  # Small batch size for testing
         )
 
     def test_add_entity_to_batch_accumulates(self):
@@ -56,7 +56,9 @@ class TestGraphExtractorBatch(unittest.TestCase):
 
         self.assertEqual(len(self.extractor._relationship_batch), 2)
         self.assertEqual(self.extractor._relationship_batch[0]["source_id"], "e1")
-        self.assertEqual(self.extractor._relationship_batch[1]["relationship_type"], "REFERENCES")
+        self.assertEqual(
+            self.extractor._relationship_batch[1]["relationship_type"], "REFERENCES"
+        )
 
     def test_add_relationship_to_batch_auto_flush(self):
         """Test auto-flush for relationships when batch size reached."""
@@ -100,16 +102,14 @@ class TestGraphExtractorBatch(unittest.TestCase):
         extractor = GraphExtractor(
             neo4j_client=self.mock_client,
             code_parser=self.mock_parser,
-            enable_batching=False
+            enable_batching=False,
         )
 
         extractor._add_entity_to_batch("e1", "Table", name="Table1")
 
         # Should call add_entity directly, not batch
         self.mock_client.add_entity.assert_called_once_with(
-            entity_id="e1",
-            entity_type="Table",
-            name="Table1"
+            entity_id="e1", entity_type="Table", name="Table1"
         )
 
         # Batch should remain empty
@@ -123,10 +123,12 @@ class TestGraphExtractorBatch(unittest.TestCase):
             "read": ["source_table"],
             "views": [],
             "columns": [],
-            "functions_and_procedures": []
+            "functions_and_procedures": [],
         }
 
-        self.extractor.ingest_sql_lineage("SELECT * FROM source_table", source_file="test.sql")
+        self.extractor.ingest_sql_lineage(
+            "SELECT * FROM source_table", source_file="test.sql"
+        )
 
         # Should have accumulated entities (not flushed automatically)
         self.assertGreater(len(self.extractor._entity_batch), 0)
@@ -142,13 +144,15 @@ class TestGraphExtractorBatch(unittest.TestCase):
                 {
                     "target": "total_amount",
                     "transformation": "quantity * price",
-                    "sources": ["source_table.quantity", "source_table.price"]
+                    "sources": ["source_table.quantity", "source_table.price"],
                 }
             ],
-            "functions_and_procedures": []
+            "functions_and_procedures": [],
         }
 
-        self.extractor.ingest_sql_lineage("SELECT * FROM source_table", source_file="test.sql")
+        self.extractor.ingest_sql_lineage(
+            "SELECT * FROM source_table", source_file="test.sql"
+        )
 
         # Column lineage creates many entities (source table, target table, columns, transformations)
         # With batch_size=3, this should trigger auto-flush
@@ -174,7 +178,9 @@ class TestGraphExtractorBatch(unittest.TestCase):
         self.extractor._add_relationship_to_batch("e1", "e2", "CONTAINS")
 
         # Mock batch_create_relationships to raise exception
-        self.mock_client.batch_create_relationships.side_effect = Exception("Neo4j error")
+        self.mock_client.batch_create_relationships.side_effect = Exception(
+            "Neo4j error"
+        )
 
         with self.assertRaises(Exception):
             self.extractor._flush_relationships()
@@ -188,7 +194,7 @@ class TestGraphExtractorBatch(unittest.TestCase):
         self.mock_parser.parse_python.return_value = {
             "classes": [{"name": "TestClass", "bases": [], "docstring": "Test"}],
             "functions": [{"name": "test_func", "args": [], "docstring": "Test"}],
-            "imports": ["os", "sys"]
+            "imports": ["os", "sys"],
         }
 
         self.extractor.ingest_python("class TestClass: pass", source_file="test.py")
@@ -202,7 +208,7 @@ class TestGraphExtractorBatch(unittest.TestCase):
         self.mock_parser.parse_json.return_value = {
             "type": "object",
             "keys": ["key1", "key2", "key3", "key4"],  # 4 keys to ensure flush
-            "array_length": 0
+            "array_length": 0,
         }
 
         self.extractor.ingest_json('{"key1": "value1"}', source_file="test.json")
@@ -219,7 +225,7 @@ class TestGraphExtractorBatch(unittest.TestCase):
             neo4j_client=self.mock_client,
             code_parser=self.mock_parser,
             enable_batching=True,
-            batch_size=5
+            batch_size=5,
         )
 
         # Add 4 entities (less than batch size)
@@ -236,5 +242,5 @@ class TestGraphExtractorBatch(unittest.TestCase):
         self.mock_client.batch_create_entities.assert_called_once()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

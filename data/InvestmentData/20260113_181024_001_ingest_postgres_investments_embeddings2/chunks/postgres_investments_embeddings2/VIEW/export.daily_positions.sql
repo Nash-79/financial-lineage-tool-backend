@@ -1,0 +1,5 @@
+-- Source: demo_data/postgres_investments_embeddings2.sql
+-- Type: SQL_STATEMENT
+-- Chunk: 22
+----------------------------------------
+/* ========================= */ /* 5. Export layer for Python / SQL Server */ /* ========================= */ CREATE OR REPLACE VIEW export.daily_positions AS SELECT p.trade_date AS valuation_date, p.account_code, COALESCE(p.instrument_isin, i.isin) AS instrument_isin, i.ticker, i.asset_class, i.region, i.sector, SUM(p.quantity) AS position_qty, AVG(p.price_ccy) AS avg_price_ccy, p.currency, SUM(p.quantity * p.price_ccy) AS notional_ccy, SUM(stg_investments.to_usd(p.currency, p.trade_date, p.quantity * p.price_ccy)) AS notional_usd FROM stg_investments.position_intraday AS p LEFT JOIN stg_investments.instrument_dim AS i ON p.instrument_isin = i.isin GROUP BY p.trade_date, p.account_code, COALESCE(p.instrument_isin, i.isin), i.ticker, i.asset_class, i.region, i.sector, p.currency

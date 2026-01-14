@@ -7,7 +7,6 @@ full file watcher complexity.
 
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, MagicMock
 from src.ingestion.batch_processor import BatchProcessor
 from src.ingestion.worker_pool import WorkerPool, Priority
 
@@ -40,7 +39,7 @@ class TestParallelComponentIntegration(unittest.IsolatedAsyncioTestCase):
             process_callback=batch_callback,
             debounce_window=0.2,
             batch_size_threshold=5,
-            enable_batching=True
+            enable_batching=True,
         )
 
         # Add 10 events
@@ -61,9 +60,9 @@ class TestParallelComponentIntegration(unittest.IsolatedAsyncioTestCase):
         batch_stats = batch_processor.get_stats()
         worker_stats = worker_pool.get_stats()
 
-        self.assertEqual(batch_stats['events_received'], 10)
-        self.assertEqual(worker_stats['tasks_completed'], 10)
-        self.assertEqual(worker_stats['tasks_failed'], 0)
+        self.assertEqual(batch_stats["events_received"], 10)
+        self.assertEqual(worker_stats["tasks_completed"], 10)
+        self.assertEqual(worker_stats["tasks_failed"], 0)
 
     async def test_deduplication_across_components(self):
         """Test that deduplication works in batch processor."""
@@ -80,9 +79,7 @@ class TestParallelComponentIntegration(unittest.IsolatedAsyncioTestCase):
                 await worker_pool.submit(file_path, process_callback, Priority.NORMAL)
 
         batch_processor = BatchProcessor(
-            process_callback=batch_callback,
-            debounce_window=0.3,
-            enable_batching=True
+            process_callback=batch_callback, debounce_window=0.3, enable_batching=True
         )
 
         # Add same file 5 times
@@ -101,8 +98,8 @@ class TestParallelComponentIntegration(unittest.IsolatedAsyncioTestCase):
 
         # Verify deduplication stats
         stats = batch_processor.get_stats()
-        self.assertEqual(stats['events_received'], 5)
-        self.assertEqual(stats['events_deduplicated'], 4)
+        self.assertEqual(stats["events_received"], 5)
+        self.assertEqual(stats["events_deduplicated"], 4)
 
     async def test_batch_size_threshold_integration(self):
         """Test that batch size threshold triggers immediate processing."""
@@ -124,7 +121,7 @@ class TestParallelComponentIntegration(unittest.IsolatedAsyncioTestCase):
             process_callback=batch_callback,
             debounce_window=5.0,  # Long debounce
             batch_size_threshold=5,
-            enable_batching=True
+            enable_batching=True,
         )
 
         # Add 12 files (should trigger 2 full batches + 1 partial on shutdown)
@@ -193,9 +190,7 @@ class TestParallelComponentIntegration(unittest.IsolatedAsyncioTestCase):
                 await worker_pool.submit(file_path, failing_callback, Priority.NORMAL)
 
         batch_processor = BatchProcessor(
-            process_callback=batch_callback,
-            debounce_window=0.2,
-            enable_batching=True
+            process_callback=batch_callback, debounce_window=0.2, enable_batching=True
         )
 
         # Add mix of good and bad files
@@ -214,9 +209,9 @@ class TestParallelComponentIntegration(unittest.IsolatedAsyncioTestCase):
 
         # Verify stats show both success and failure
         stats = worker_pool.get_stats()
-        self.assertEqual(stats['tasks_completed'], 3)
-        self.assertEqual(stats['tasks_failed'], 2)
-        self.assertLess(stats['success_rate_percent'], 100.0)
+        self.assertEqual(stats["tasks_completed"], 3)
+        self.assertEqual(stats["tasks_failed"], 2)
+        self.assertLess(stats["success_rate_percent"], 100.0)
 
     async def test_statistics_consistency(self):
         """Test that statistics are consistent across components."""
@@ -232,9 +227,7 @@ class TestParallelComponentIntegration(unittest.IsolatedAsyncioTestCase):
                 await worker_pool.submit(file_path, process_callback, Priority.NORMAL)
 
         batch_processor = BatchProcessor(
-            process_callback=batch_callback,
-            debounce_window=0.2,
-            enable_batching=True
+            process_callback=batch_callback, debounce_window=0.2, enable_batching=True
         )
 
         # Add 20 events
@@ -243,25 +236,26 @@ class TestParallelComponentIntegration(unittest.IsolatedAsyncioTestCase):
 
         # Wait for processing
         await asyncio.sleep(1.0)
-
-        # Get stats before shutdown
-        batch_stats = batch_processor.get_stats()
-        worker_stats = worker_pool.get_stats()
+        await worker_pool.task_queue.join()
 
         # Cleanup
         await batch_processor.shutdown()
         await worker_pool.shutdown()
 
+        # Get stats after shutdown
+        batch_stats = batch_processor.get_stats()
+        worker_stats = worker_pool.get_stats()
+
         # Verify batch processor stats
-        self.assertEqual(batch_stats['events_received'], 20)
-        self.assertGreater(batch_stats['batches_processed'], 0)
+        self.assertEqual(batch_stats["events_received"], 20)
+        self.assertGreater(batch_stats["batches_processed"], 0)
 
         # Verify worker pool stats
-        self.assertEqual(worker_stats['num_workers'], 3)
-        self.assertEqual(worker_stats['tasks_completed'], 20)
-        self.assertEqual(worker_stats['tasks_failed'], 0)
-        self.assertEqual(worker_stats['success_rate_percent'], 100.0)
+        self.assertEqual(worker_stats["num_workers"], 3)
+        self.assertEqual(worker_stats["tasks_completed"], 20)
+        self.assertEqual(worker_stats["tasks_failed"], 0)
+        self.assertEqual(worker_stats["success_rate_percent"], 100.0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

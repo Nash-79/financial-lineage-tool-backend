@@ -116,29 +116,37 @@ class BatchProcessor:
 
     async def _reset_debounce_timer(self):
         """Reset debounce timer."""
-        # Cancel existing timer if running
         if self._debounce_task and not self._debounce_task.done():
-            self._debounce_task.cancel()
+            return
 
-        # Start new timer
         self._debounce_task = asyncio.create_task(self._debounce_timer())
 
     async def _debounce_timer(self):
         """Debounce timer - flushes batch after window expires."""
         try:
-            await asyncio.sleep(self.debounce_window)
+            while True:
+                await asyncio.sleep(self.debounce_window)
 
-            # Timer expired without new events
-            if self._pending_files:
-                logger.debug(
-                    f"Debounce window ({self.debounce_window}s) expired. "
-                    f"Flushing {len(self._pending_files)} files."
-                )
-                await self.flush_now()
+                if time.time() - self._last_event_time < self.debounce_window:
+                    continue
+
+                if self._pending_files:
+                    logger.debug(
+                        f"Debounce window ({self.debounce_window}s) expired. "
+                        f"Flushing {len(self._pending_files)} files."
+                    )
+                    await self.flush_now()
+
+                if not self._pending_files:
+                    break
 
         except asyncio.CancelledError:
             # Timer was reset - this is normal
             pass
+        finally:
+            self._debounce_task = None
+            if self._pending_files:
+                await self._reset_debounce_timer()
 
     async def flush_now(self):
         """
@@ -149,10 +157,6 @@ class BatchProcessor:
         """
         if not self._pending_files:
             return
-
-        # Cancel debounce timer
-        if self._debounce_task and not self._debounce_task.done():
-            self._debounce_task.cancel()
 
         # Extract pending files
         files_to_process = list(self._pending_files)

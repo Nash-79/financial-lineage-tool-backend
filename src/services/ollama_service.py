@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import logging
 from typing import Optional, Any
 
 import httpx
@@ -13,6 +15,7 @@ from ..api.config import config
 
 # Cache TTL in seconds (24 hours)
 EMBEDDING_CACHE_TTL = 86400
+logger = logging.getLogger(__name__)
 
 
 class OllamaClient:
@@ -125,7 +128,7 @@ class OllamaClient:
                     return json.loads(cached)
             except Exception as e:
                 # Cache failure shouldn't block embedding
-                print(f"[!] Embedding cache read failed: {e}")
+                logger.warning("Embedding cache read failed: %s", e)
 
         # Cache miss - call Ollama
         self.cache_misses += 1
@@ -143,13 +146,11 @@ class OllamaClient:
             try:
                 cache_key = self._get_cache_key(text, model)
                 await self.redis.setex(
-                    cache_key,
-                    EMBEDDING_CACHE_TTL,
-                    json.dumps(embedding)
+                    cache_key, EMBEDDING_CACHE_TTL, json.dumps(embedding)
                 )
             except Exception as e:
                 # Cache failure shouldn't block response
-                print(f"[!] Embedding cache write failed: {e}")
+                logger.warning("Embedding cache write failed: %s", e)
 
         return embedding
 
@@ -166,6 +167,46 @@ class OllamaClient:
             "cache_misses": self.cache_misses,
             "hit_rate": round(hit_rate, 3),
         }
+
+    async def embed_batch(
+        self,
+        texts: list[str],
+        model: str,
+        batch_size: int = 50,
+    ) -> list[list[float]]:
+        """Batch embedding with caching and size splitting.
+
+        Args:
+            texts: List of texts to embed.
+            model: Embedding model name.
+            batch_size: Max number of texts per batch (default 50).
+
+        Returns:
+            List of embeddings in the same order as provided texts.
+        """
+        if not texts:
+            return []
+
+        async def fetch_one(text: str) -> list[float]:
+            return await self.embed(text, model=model)
+
+        results: list[list[float]] = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            embeddings = await asyncio.gather(*(fetch_one(t) for t in batch))
+            results.extend(embeddings)
+        return results
+
+    async def warm_cache(
+        self, texts: list[str], model: str, batch_size: int = 50
+    ) -> None:
+        """Pre-populate embedding cache for a set of texts."""
+        if not texts:
+            return
+        try:
+            await self.embed_batch(texts, model=model, batch_size=batch_size)
+        except Exception as exc:
+            logger.warning("Cache warming failed: %s", exc)
 
     async def generate_stream(
         self,

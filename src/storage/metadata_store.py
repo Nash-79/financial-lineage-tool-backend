@@ -9,7 +9,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from .duckdb_client import get_duckdb_client
 
@@ -24,10 +24,7 @@ class ProjectStore:
     """
 
     async def create(
-        self,
-        name: str,
-        description: Optional[str] = None,
-        id: Optional[str] = None
+        self, name: str, description: Optional[str] = None, id: Optional[str] = None
     ) -> dict:
         """
         Create a new project.
@@ -48,7 +45,7 @@ class ProjectStore:
             INSERT INTO projects (id, name, description, created_at, updated_at)
             VALUES (?, ?, ?, current_timestamp, current_timestamp)
             """,
-            (project_id, name, description)
+            (project_id, name, description),
         )
 
         logger.info(f"Created project: {project_id}")
@@ -83,7 +80,7 @@ class ProjectStore:
             WHERE p.id = ?
             GROUP BY p.id, p.name, p.description, p.created_at, p.updated_at
             """,
-            (project_id,)
+            (project_id,),
         )
 
         if not result:
@@ -131,7 +128,7 @@ class ProjectStore:
             ORDER BY p.created_at DESC
             LIMIT ? OFFSET ?
             """,
-            (limit, offset)
+            (limit, offset),
         )
 
         return [
@@ -151,7 +148,7 @@ class ProjectStore:
         self,
         project_id: str,
         name: Optional[str] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
     ) -> Optional[dict]:
         """
         Update project by ID.
@@ -185,8 +182,7 @@ class ProjectStore:
         params.append(project_id)
 
         await client.execute_write(
-            f"UPDATE projects SET {', '.join(updates)} WHERE id = ?",
-            tuple(params)
+            f"UPDATE projects SET {', '.join(updates)} WHERE id = ?", tuple(params)
         )
 
         logger.info(f"Updated project: {project_id}")
@@ -210,10 +206,7 @@ class ProjectStore:
         if not self.get(project_id):
             return False
 
-        await client.execute_write(
-            "DELETE FROM projects WHERE id = ?",
-            (project_id,)
-        )
+        await client.execute_write("DELETE FROM projects WHERE id = ?", (project_id,))
 
         logger.info(f"Deleted project: {project_id}")
         return True
@@ -227,10 +220,7 @@ class ProjectStore:
     def exists(self, project_id: str) -> bool:
         """Check if project exists."""
         client = get_duckdb_client()
-        result = client.fetchone(
-            "SELECT 1 FROM projects WHERE id = ?",
-            (project_id,)
-        )
+        result = client.fetchone("SELECT 1 FROM projects WHERE id = ?", (project_id,))
         return result is not None
 
     def get_context(self, project_id: str) -> Optional[dict]:
@@ -251,7 +241,7 @@ class ProjectStore:
             FROM projects
             WHERE id = ?
             """,
-            (project_id,)
+            (project_id,),
         )
 
         if not result:
@@ -276,7 +266,7 @@ class ProjectStore:
                 "related_projects": [],
                 "domain_hints": [],
                 "file_name": None,
-                "updated_at": None
+                "updated_at": None,
             }
 
         # Include file path if present
@@ -286,10 +276,7 @@ class ProjectStore:
         return context
 
     async def update_context(
-        self,
-        project_id: str,
-        context: dict,
-        context_file_path: Optional[str] = None
+        self, project_id: str, context: dict, context_file_path: Optional[str] = None
     ) -> Optional[dict]:
         """
         Update project context.
@@ -333,7 +320,7 @@ class ProjectStore:
                 updated_at = current_timestamp
             WHERE id = ?
             """,
-            (context_json, context_file_path, project_id)
+            (context_json, context_file_path, project_id),
         )
 
         logger.info(f"Updated context for project: {project_id}")
@@ -359,7 +346,12 @@ class ProjectStore:
             if context["format"] not in ("text", "markdown"):
                 errors.append("format must be 'text' or 'markdown'")
 
-        for field in ["source_entities", "target_entities", "related_projects", "domain_hints"]:
+        for field in [
+            "source_entities",
+            "target_entities",
+            "related_projects",
+            "domain_hints",
+        ]:
             if field in context:
                 if not isinstance(context[field], list):
                     errors.append(f"{field} must be an array")
@@ -382,7 +374,7 @@ class RepositoryStore:
         name: str,
         source: str,
         source_ref: Optional[str] = None,
-        id: Optional[str] = None
+        id: Optional[str] = None,
     ) -> dict:
         """
         Create a new repository.
@@ -405,7 +397,7 @@ class RepositoryStore:
             INSERT INTO repositories (id, project_id, name, source, source_ref, created_at)
             VALUES (?, ?, ?, ?, ?, current_timestamp)
             """,
-            (repo_id, project_id, name, source, source_ref)
+            (repo_id, project_id, name, source, source_ref),
         )
 
         logger.info(f"Created repository: {repo_id} in project: {project_id}")
@@ -430,7 +422,7 @@ class RepositoryStore:
             FROM repositories
             WHERE id = ?
             """,
-            (repo_id,)
+            (repo_id,),
         )
 
         if not result:
@@ -468,7 +460,7 @@ class RepositoryStore:
             WHERE project_id = ?
             ORDER BY created_at DESC
             """,
-            (project_id,)
+            (project_id,),
         )
 
         return [
@@ -490,7 +482,7 @@ class RepositoryStore:
         self,
         repo_id: str,
         file_count: Optional[int] = None,
-        node_count: Optional[int] = None
+        node_count: Optional[int] = None,
     ) -> Optional[dict]:
         """
         Update repository file and node counts.
@@ -523,8 +515,7 @@ class RepositoryStore:
         params.append(repo_id)
 
         await client.execute_write(
-            f"UPDATE repositories SET {', '.join(updates)} WHERE id = ?",
-            tuple(params)
+            f"UPDATE repositories SET {', '.join(updates)} WHERE id = ?", tuple(params)
         )
 
         return self.get(repo_id)
@@ -546,10 +537,7 @@ class RepositoryStore:
         if not self.get(repo_id):
             return False
 
-        await client.execute_write(
-            "DELETE FROM repositories WHERE id = ?",
-            (repo_id,)
-        )
+        await client.execute_write("DELETE FROM repositories WHERE id = ?", (repo_id,))
 
         logger.info(f"Deleted repository: {repo_id}")
         return True
@@ -557,10 +545,7 @@ class RepositoryStore:
     def exists(self, repo_id: str) -> bool:
         """Check if repository exists."""
         client = get_duckdb_client()
-        result = client.fetchone(
-            "SELECT 1 FROM repositories WHERE id = ?",
-            (repo_id,)
-        )
+        result = client.fetchone("SELECT 1 FROM repositories WHERE id = ?", (repo_id,))
         return result is not None
 
     async def update_last_synced(self, repo_id: str) -> Optional[dict]:
@@ -580,11 +565,147 @@ class RepositoryStore:
 
         await client.execute_write(
             "UPDATE repositories SET last_synced = current_timestamp WHERE id = ?",
-            (repo_id,)
+            (repo_id,),
         )
 
         logger.info(f"Updated last_synced for repository: {repo_id}")
         return self.get(repo_id)
+
+
+class ProjectLinkStore:
+    """
+    CRUD operations for project-to-project links.
+
+    Project links capture relationships between projects for cross-project lineage.
+    """
+
+    async def create(
+        self,
+        source_project_id: str,
+        target_project_id: str,
+        link_type: str = "manual",
+        description: Optional[str] = None,
+        id: Optional[str] = None,
+    ) -> dict:
+        """
+        Create a new link between two projects.
+
+        Args:
+            source_project_id: Source project ID
+            target_project_id: Target project ID
+            link_type: Link type (manual/auto)
+            description: Optional link description
+            id: Optional link ID (generated if not provided)
+
+        Returns:
+            Created project link dict
+        """
+        client = get_duckdb_client()
+        link_id = id or str(uuid.uuid4())
+
+        await client.execute_write(
+            """
+            INSERT INTO project_links (
+                id, source_project_id, target_project_id, link_type, description, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, current_timestamp)
+            """,
+            (link_id, source_project_id, target_project_id, link_type, description),
+        )
+
+        logger.info(
+            "Created project link %s: %s -> %s",
+            link_id,
+            source_project_id,
+            target_project_id,
+        )
+        return self.get(link_id)
+
+    def get(self, link_id: str) -> Optional[dict]:
+        """
+        Get project link by ID.
+
+        Args:
+            link_id: Link ID
+
+        Returns:
+            Project link dict or None if not found
+        """
+        client = get_duckdb_client()
+        result = client.fetchone(
+            """
+            SELECT id, source_project_id, target_project_id, link_type,
+                   description, created_at
+            FROM project_links
+            WHERE id = ?
+            """,
+            (link_id,),
+        )
+        if not result:
+            return None
+
+        return {
+            "id": result[0],
+            "source_project_id": result[1],
+            "target_project_id": result[2],
+            "link_type": result[3],
+            "description": result[4],
+            "created_at": result[5].isoformat() if result[5] else None,
+        }
+
+    def list_by_project(self, project_id: str) -> list[dict]:
+        """
+        List project links involving a specific project.
+
+        Args:
+            project_id: Project ID
+
+        Returns:
+            List of project link dicts
+        """
+        client = get_duckdb_client()
+        results = client.fetchall(
+            """
+            SELECT id, source_project_id, target_project_id, link_type,
+                   description, created_at
+            FROM project_links
+            WHERE source_project_id = ? OR target_project_id = ?
+            ORDER BY created_at DESC
+            """,
+            (project_id, project_id),
+        )
+        return [
+            {
+                "id": row[0],
+                "source_project_id": row[1],
+                "target_project_id": row[2],
+                "link_type": row[3],
+                "description": row[4],
+                "created_at": row[5].isoformat() if row[5] else None,
+            }
+            for row in results
+        ]
+
+    async def delete(self, link_id: str) -> bool:
+        """
+        Delete a project link by ID.
+
+        Args:
+            link_id: Link ID
+
+        Returns:
+            True if deleted, False if not found
+        """
+        client = get_duckdb_client()
+        if not self.get(link_id):
+            return False
+
+        await client.execute_write(
+            "DELETE FROM project_links WHERE id = ?",
+            (link_id,),
+        )
+        logger.info("Deleted project link: %s", link_id)
+        return True
 
 
 class LinkStore:
@@ -604,7 +725,7 @@ class LinkStore:
         description: Optional[str] = None,
         confidence: Optional[float] = None,
         evidence: Optional[list[dict]] = None,
-        id: Optional[str] = None
+        id: Optional[str] = None,
     ) -> dict:
         """
         Create a new link between repositories.
@@ -634,11 +755,21 @@ class LinkStore:
                                link_type, description, confidence, evidence, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, current_timestamp)
             """,
-            (link_id, project_id, source_repo_id, target_repo_id,
-             link_type, description, confidence, evidence_json)
+            (
+                link_id,
+                project_id,
+                source_repo_id,
+                target_repo_id,
+                link_type,
+                description,
+                confidence,
+                evidence_json,
+            ),
         )
 
-        logger.info(f"Created link: {link_id} from {source_repo_id} to {target_repo_id}")
+        logger.info(
+            f"Created link: {link_id} from {source_repo_id} to {target_repo_id}"
+        )
         return self.get(link_id)
 
     def get(self, link_id: str) -> Optional[dict]:
@@ -660,7 +791,7 @@ class LinkStore:
             FROM links
             WHERE id = ?
             """,
-            (link_id,)
+            (link_id,),
         )
 
         if not result:
@@ -670,7 +801,9 @@ class LinkStore:
         evidence = None
         if result[7]:
             try:
-                evidence = json.loads(result[7]) if isinstance(result[7], str) else result[7]
+                evidence = (
+                    json.loads(result[7]) if isinstance(result[7], str) else result[7]
+                )
             except (json.JSONDecodeError, TypeError):
                 evidence = None
 
@@ -706,7 +839,7 @@ class LinkStore:
             WHERE project_id = ?
             ORDER BY created_at DESC
             """,
-            (project_id,)
+            (project_id,),
         )
 
         links = []
@@ -718,17 +851,19 @@ class LinkStore:
                 except (json.JSONDecodeError, TypeError):
                     evidence = None
 
-            links.append({
-                "id": row[0],
-                "project_id": row[1],
-                "source_repo_id": row[2],
-                "target_repo_id": row[3],
-                "link_type": row[4],
-                "description": row[5],
-                "confidence": row[6],
-                "evidence": evidence,
-                "created_at": row[8].isoformat() if row[8] else None,
-            })
+            links.append(
+                {
+                    "id": row[0],
+                    "project_id": row[1],
+                    "source_repo_id": row[2],
+                    "target_repo_id": row[3],
+                    "link_type": row[4],
+                    "description": row[5],
+                    "confidence": row[6],
+                    "evidence": evidence,
+                    "created_at": row[8].isoformat() if row[8] else None,
+                }
+            )
 
         return links
 
@@ -747,10 +882,7 @@ class LinkStore:
         if not self.get(link_id):
             return False
 
-        await client.execute_write(
-            "DELETE FROM links WHERE id = ?",
-            (link_id,)
-        )
+        await client.execute_write("DELETE FROM links WHERE id = ?", (link_id,))
 
         logger.info(f"Deleted link: {link_id}")
         return True
@@ -774,7 +906,7 @@ async def ensure_default_project() -> dict:
             id="default",
             name="Default Project",
             description="Auto-created for backward compatibility. "
-                       "Endpoints without project_id use this project."
+            "Endpoints without project_id use this project.",
         )
 
     return project_store.get("default") or project_store.list(limit=1)[0]

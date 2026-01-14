@@ -1,0 +1,127 @@
+{
+  "metadata": {
+    "phase": "post",
+    "project_name": "InvestmentData",
+    "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+    "ingestion_id": "e5e39659-347f-4f51-a85d-161781bdb999",
+    "run_id": "8695ba9f-5e40-40b2-b953-54965b0b810d",
+    "file_paths": [
+      "demo_data/postgres_investments_embeddings.sql"
+    ],
+    "timestamp": "2026-01-13T18:08:08.443531",
+    "node_count": 5,
+    "edge_count": 2,
+    "node_label_counts": {
+      "Table": 1,
+      "FunctionOrProcedure": 4
+    },
+    "relationship_type_counts": {
+      "READS": 1,
+      "CALLS": 1
+    }
+  },
+  "nodes": [
+    {
+      "id": "urn:li:Table:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:raw_market.trade_feed_venue_a",
+      "labels": [
+        "Table"
+      ],
+      "properties": {
+        "subtype": "Table",
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "raw_market.trade_feed_venue_a",
+        "source": "ingest_file",
+        "id": "urn:li:Table:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:raw_market.trade_feed_venue_a",
+        "source_file": "demo_data/postgres_investments_embeddings.sql"
+      }
+    },
+    {
+      "id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.load_instrument_dim_from_json",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "subtype": "FunctionOrProcedure",
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "stg_investments.load_instrument_dim_from_json",
+        "source": "ingest_file",
+        "id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.load_instrument_dim_from_json",
+        "source_file": "demo_data/postgres_investments_embeddings.sql"
+      }
+    },
+    {
+      "id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.to_usd",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "subtype": "FunctionOrProcedure",
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "stg_investments.to_usd",
+        "source": "ingest_file",
+        "id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.to_usd",
+        "source_file": "demo_data/postgres_investments_embeddings.sql"
+      }
+    },
+    {
+      "id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.normalize_trade",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "subtype": "FunctionOrProcedure",
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "stg_investments.normalize_trade",
+        "source": "ingest_file",
+        "id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.normalize_trade",
+        "source_file": "demo_data/postgres_investments_embeddings.sql"
+      }
+    },
+    {
+      "id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.trg_position_intraday_audit_fn",
+      "labels": [
+        "FunctionOrProcedure"
+      ],
+      "properties": {
+        "subtype": "FunctionOrProcedure",
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "name": "stg_investments.trg_position_intraday_audit_fn",
+        "source": "ingest_file",
+        "id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.trg_position_intraday_audit_fn",
+        "source_file": "demo_data/postgres_investments_embeddings.sql"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source_id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.normalize_trade",
+      "target_id": "urn:li:Table:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:raw_market.trade_feed_venue_a",
+      "type": "READS",
+      "properties": {
+        "ingestion_id": "c52302eb-1391-470a-a86b-c65c1ac6c822",
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "confidence": 0.9,
+        "reasoning": "The function 'normalize_trade' is used in a CROSS JOIN LATERAL with 'raw_market.trade_feed_venue_a' in the view 'stg_investments.v_all_trades'.",
+        "model": "mistralai/devstral-2512:free",
+        "source": "llm",
+        "source_file": "data/postgres_investments.sql",
+        "status": "proposed"
+      }
+    },
+    {
+      "source_id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.trg_position_intraday_audit_fn",
+      "target_id": "urn:li:FunctionOrProcedure:8ae9366d-a5da-44a3-a0d0-c0d2355b9b97:stg_investments.to_usd",
+      "type": "CALLS",
+      "properties": {
+        "ingestion_id": "c52302eb-1391-470a-a86b-c65c1ac6c822",
+        "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+        "confidence": 0.9,
+        "reasoning": "The trigger function 'trg_position_intraday_audit_fn' calls 'to_usd' to convert notional values to USD.",
+        "model": "mistralai/devstral-2512:free",
+        "source": "llm",
+        "source_file": "data/postgres_investments.sql",
+        "status": "proposed"
+      }
+    }
+  ]
+}

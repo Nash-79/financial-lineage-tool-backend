@@ -16,14 +16,159 @@ This guide provides step-by-step instructions for deploying the optimized data i
 
 ---
 
+## Production Environment Variables
+
+### 🔒 Required for Production Deployment
+
+The following environment variables **MUST** be set before deploying to production. The application will fail to start if these are missing or invalid when `ENVIRONMENT=production`.
+
+**Security-Critical Variables**:
+
+```bash
+# Environment mode (REQUIRED)
+ENVIRONMENT=production  # Enables strict validation
+
+# Neo4j Database Credentials (REQUIRED)
+NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your-secure-password-here  # Min 8 characters, NO HARDCODED VALUES
+NEO4J_DATABASE=neo4j
+
+# JWT Authentication (REQUIRED)
+JWT_SECRET_KEY=your-secret-key-min-32-chars  # Generate with: openssl rand -hex 32
+JWT_ALGORITHM=HS256
+JWT_EXPIRATION_HOURS=24
+
+# CORS Configuration (REQUIRED)
+ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com  # NO wildcards in production
+```
+
+**How to generate secure credentials**:
+
+```bash
+# Generate JWT secret key (32+ characters)
+openssl rand -hex 32
+
+# Verify NEO4J_PASSWORD is set
+echo $NEO4J_PASSWORD  # Should output your password, not empty
+```
+
+**Validation**:
+The application automatically validates production configuration on startup. If validation fails, you'll see error messages like:
+
+```
+Production configuration validation failed:
+  - NEO4J_PASSWORD must be set via environment variable in production
+  - JWT_SECRET_KEY must be at least 32 characters for security
+  - ALLOWED_ORIGINS must be explicitly configured (wildcards not allowed in production)
+```
+
+### ⚙️ Optional Production Variables
+
+**Inference Fallback** (cloud providers for OOM prevention):
+
+```bash
+# Inference fallback provider (optional, default: groq)
+INFERENCE_FALLBACK_PROVIDER=groq  # Options: groq, openrouter, none
+
+# Groq API (free tier: 30 req/min)
+GROQ_API_KEY=your-groq-api-key  # Get from https://console.groq.com/
+
+# OpenRouter API (free tier available)
+OPENROUTER_API_KEY=your-openrouter-key  # Get from https://openrouter.ai/
+
+# Default cloud model
+INFERENCE_DEFAULT_MODEL=llama-3.1-70b-versatile
+```
+
+**Observability** (SigNoz/OpenTelemetry):
+
+```bash
+OTEL_ENABLED=true
+OTEL_SERVICE_NAME=financial-lineage-backend
+OTEL_EXPORTER_OTLP_ENDPOINT=http://signoz-host:4318
+```
+
+**Hybrid Search (Qdrant sparse + dense)**:
+
+```bash
+# Enable hybrid search for new collections
+ENABLE_HYBRID_SEARCH=true
+```
+
+**Upgrade note**: Existing Qdrant collections created without sparse vectors will continue
+to run dense-only searches. To enable hybrid search, create a new collection and re-index
+the corpus (or follow your migration script to copy vectors into a new collection).
+
+**Parser Plugin Configuration**:
+
+```bash
+# Enable parser plugins (comma-separated class paths)
+LINEAGE_PLUGINS=src.ingestion.plugins.sql_standard.StandardSqlPlugin,src.ingestion.plugins.python_treesitter.PythonTreesitterPlugin,src.ingestion.plugins.json_enricher.JsonEnricherPlugin
+
+# Optional plugin configuration (JSON string)
+LINEAGE_PLUGIN_CONFIG_JSON={"src.ingestion.plugins.sql_standard.StandardSqlPlugin":{"default_dialect":"duckdb"},"src.ingestion.plugins.python_treesitter.PythonTreesitterPlugin":{"prefer_ast_for_small_files":true,"ast_max_lines":100,"sql_extraction_enabled":true}}
+```
+
+**Tree-sitter Python Dependencies**:
+
+```bash
+# Ensure tree-sitter dependencies are installed
+pip install tree-sitter tree-sitter-python
+```
+
+**Rate Limiting** (optional, prevents abuse):
+
+```bash
+RATE_LIMIT_PER_USER=100  # Requests per 10 minutes
+RATE_LIMIT_CHAT_DEEP=10  # Deep chat requests per minute
+RATE_LIMIT_CHAT_SEMANTIC=30  # Semantic chat requests per minute
+RATE_LIMIT_FILES_UPLOAD=5  # File uploads per minute
+```
+
+**GitHub OAuth** (optional, for GitHub integration):
+
+```bash
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GITHUB_REDIRECT_URI=https://app.example.com/connectors/github/callback
+```
+
+**Audit Logging** (optional, for compliance):
+
+```bash
+AUDIT_LOG_FULL_QUERIES=false  # Set to true to log full query text (default: hash only)
+AUDIT_LOG_RETENTION_DAYS=90  # Audit log retention period
+```
+
+### 📋 Complete .env Template
+
+Copy [../../.env.example](../../.env.example) to `.env` and fill in your production values:
+
+```bash
+cp .env.example .env
+vi .env  # Edit with production credentials
+```
+
+**DO NOT commit .env to version control!** Add to `.gitignore`:
+```bash
+echo ".env" >> .gitignore
+```
+
+---
+
 ## Pre-Deployment Checklist
 
 ### ✅ Required Before Deployment
 
 - [ ] All code changes merged to main branch
 - [ ] Tests passing (99% coverage - 66/67 tests)
+- [ ] **Production environment variables configured** (see above)
+- [ ] **JWT_SECRET_KEY generated** (min 32 characters)
+- [ ] **NEO4J_PASSWORD set** (no hardcoded credentials)
+- [ ] **ALLOWED_ORIGINS configured** (no wildcards)
 - [ ] Staging environment tested successfully
-- [ ] Prometheus/Grafana monitoring configured
+- [ ] SigNoz observability configured (OTLP enabled)
 - [ ] Backup of current production data
 - [ ] Rollback procedures reviewed by team
 - [ ] Deployment window scheduled (low-traffic period recommended)
@@ -34,7 +179,7 @@ This guide provides step-by-step instructions for deploying the optimized data i
 
 - [ ] Python 3.10+ installed
 - [ ] Neo4j 4.0+ accessible
-- [ ] Prometheus metrics endpoint accessible
+- [ ] OTLP endpoint (SigNoz) reachable for observability exports
 - [ ] Sufficient disk space for parse cache (est. 100MB per 10,000 files)
 - [ ] Sufficient memory (500MB per 1,000 files)
 - [ ] CPU cores available for parallel workers (4 recommended)
@@ -336,27 +481,25 @@ python -c "from src.config.feature_flags import FeatureFlags; FeatureFlags.print
 
 ---
 
-## Grafana Dashboard Setup
+## SigNoz Observability Setup
 
-**Import dashboard**:
-1. Login to Grafana
-2. Navigate to Dashboards → Import
-3. Upload `docs/grafana/ingestion_performance.json`
-4. Select Prometheus datasource
-5. Click Import
+**Start SigNoz**:
+1. Run `docker compose -f docker-compose.signoz.yml up -d`
+2. Open `http://localhost:3301`
+3. Set OTLP env vars for the API process:
+   - `OTEL_ENABLED=true`
+   - `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`
+   - `OTEL_SERVICE_NAME=financial-lineage-backend`
 
-**Key panels to monitor**:
-- File Processing Throughput
-- Parse Cache Hit Rate
-- Batch Processing Duration
-- Worker Pool Status
-- Success vs Failure Rate
+**Key views to monitor**:
+- Service traces for API latency and errors
+- Logs for ingestion pipeline stages and failures
+- Metrics for throughput, cache hit rate, and worker utilization
 
-**Set up alerts**:
-- Throughput < 5x baseline
-- Cache hit rate < 15%
-- Error rate > 5%
-- Queue size > 150
+**Set up alerts (optional)**:
+- High error rate
+- High p95 latency
+- Ingestion throughput drop
 
 ---
 
@@ -441,7 +584,7 @@ Deployment is considered successful when:
 - ✅ Error rate < 1%
 - ✅ No memory/CPU issues
 - ✅ Prometheus metrics collecting correctly
-- ✅ Grafana dashboard operational
+- ✅ SigNoz UI operational
 - ✅ 24 hours of stable operation
 
 ---
@@ -469,7 +612,7 @@ Expected Impact:
 - Reduced processing time: 10 min → 1 min for 1000 files
 
 Monitoring:
-- Grafana: http://grafana/d/financial-lineage-ingestion
+- SigNoz: http://localhost:3301
 - Metrics: http://localhost:8000/metrics
 
 Rollback: < 5 minutes if needed
@@ -499,7 +642,7 @@ Results:
 
 All optimizations enabled and performing as expected.
 
-Monitoring continues via Grafana dashboard.
+Monitoring continues via SigNoz UI.
 
 Thanks,
 DevOps Team

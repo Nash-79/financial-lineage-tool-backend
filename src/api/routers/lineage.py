@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+import re
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+
+from src.utils.urn import is_valid_urn, parse_urn
 
 from ..models.lineage import (
     EdgeReviewRequest,
@@ -26,6 +29,59 @@ def get_app_state() -> Any:
     from ..main_local import state
 
     return state
+
+
+def _parse_edge_asset_path(asset_path: str) -> Optional[Dict[str, str]]:
+    if "/" not in asset_path:
+        return None
+    rel_type, rest = asset_path.split("/", 1)
+    if "->" not in rest or ":" not in rest:
+        return None
+    source_part, target_part = rest.split("->", 1)
+    if ":" not in source_part or ":" not in target_part:
+        return None
+    source_label, source_name = source_part.split(":", 1)
+    target_label, target_name = target_part.split(":", 1)
+    return {
+        "rel_type": rel_type,
+        "source_label": source_label,
+        "source_name": source_name,
+        "target_label": target_label,
+        "target_name": target_name,
+    }
+
+
+def _is_safe_label(value: str) -> bool:
+    return bool(re.match(r"^[A-Za-z0-9_]+$", value))
+
+
+def _resolve_node_urn(
+    state: Any, urn: str, project_id_override: Optional[str]
+) -> Optional[str]:
+    parts = parse_urn(urn)
+    if parts["entity_type"] != "neo4j-node":
+        return None
+    if "/" not in parts["asset_path"]:
+        return None
+    label, name = parts["asset_path"].split("/", 1)
+    if not _is_safe_label(label):
+        return None
+    project_id = project_id_override or parts["project_id"]
+    query = """
+    MATCH (n)
+    WHERE $label IN labels(n)
+      AND toLower(n.name) = toLower($name)
+      AND (n.project_id = $project_id OR $project_id IS NULL)
+    RETURN n
+    LIMIT 1
+    """
+    results = state.graph._execute_query(
+        query, {"label": label, "name": name, "project_id": project_id}
+    )
+    if not results:
+        return None
+    node_data = results[0]["n"]
+    return node_data.get("id")
 
 
 @router.post("/query", response_model=LineageResponse)
@@ -121,9 +177,7 @@ async def get_lineage_nodes(
             where_clauses.append("toLower(n.name) CONTAINS toLower($search)")
             params["search"] = search
 
-        where_stmt = (
-            "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
-        )
+        where_stmt = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
         query = f"""
         MATCH (n)
@@ -155,9 +209,15 @@ async def get_lineage_nodes(
 @router.get("/edges")
 async def get_lineage_edges(
     project_id: Optional[str] = Query(None, description="Filter by project ID"),
-    status: Optional[str] = Query(None, description="Filter by edge status (approved/pending_review/rejected)"),
-    min_confidence: Optional[float] = Query(None, description="Minimum confidence score (0.0-1.0)"),
-    source: Optional[str] = Query(None, description="Filter by edge source (parser/ollama_llm/human)"),
+    status: Optional[str] = Query(
+        None, description="Filter by edge status (approved/pending_review/rejected)"
+    ),
+    min_confidence: Optional[float] = Query(
+        None, description="Minimum confidence score (0.0-1.0)"
+    ),
+    source: Optional[str] = Query(
+        None, description="Filter by edge source (parser/ollama_llm/human)"
+    ),
 ) -> Dict[str, Any]:
     """Get lineage edges (relationships) from the knowledge graph.
 
@@ -177,21 +237,23 @@ async def get_lineage_edges(
         params = {}
 
         if project_id:
-            where_clauses.append("source.project_id = $project_id AND target.project_id = $project_id")
+            where_clauses.append(
+                "source.project_id = $project_id AND target.project_id = $project_id"
+            )
             params["project_id"] = project_id
-        
+
         if status:
             where_clauses.append("r.status = $status")
             params["status"] = status
-        
+
         if min_confidence is not None:
             where_clauses.append("r.confidence >= $min_confidence")
             params["min_confidence"] = min_confidence
-        
+
         if source:
             where_clauses.append("r.source = $source")
             params["source"] = source
-        
+
         where_stmt = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
         query = f"""
@@ -212,15 +274,17 @@ async def get_lineage_edges(
             # Extract metadata and rename 'source' to 'edge_source' to avoid
             # overwriting the node source ID with the relationship provenance
             meta = dict(record.get("metadata", {}) or {})
-            edge_source = meta.pop("source", None)  # e.g., 'parser', 'ollama_llm', 'human'
-            
+            edge_source = meta.pop(
+                "source", None
+            )  # e.g., 'parser', 'ollama_llm', 'human'
+
             edges.append(
                 {
                     "id": meta.get("id"),
-                    "source": record["source"],      # Node ID
-                    "target": record["target"],      # Node ID
+                    "source": record["source"],  # Node ID
+                    "target": record["target"],  # Node ID
                     "type": record["type"],
-                    "edge_source": edge_source,       # Relationship provenance
+                    "edge_source": edge_source,  # Relationship provenance
                     **meta,
                 }
             )
@@ -272,21 +336,21 @@ async def search_lineage(
 @router.post("/review", response_model=EdgeReviewResponse)
 async def review_edge(request: EdgeReviewRequest) -> EdgeReviewResponse:
     """Review and approve/reject a lineage edge.
-    
+
     Allows manual review of LLM-inferred edges or any edge in the graph.
     Updates the edge status based on the review action.
-    
+
     Args:
         request: Edge review request with source, target, relationship type, and action
-        
+
     Returns:
         EdgeReviewResponse indicating success/failure and updated edge metadata
     """
     state = get_app_state()
-    
+
     if not state.graph:
         raise HTTPException(status_code=503, detail="Graph not initialized")
-    
+
     try:
         # Verify edge exists
         check_query = """
@@ -294,23 +358,24 @@ async def review_edge(request: EdgeReviewRequest) -> EdgeReviewResponse:
         WHERE type(r) = $relationship_type
         RETURN r, properties(r) as props
         """
-        
-        existing = state.graph._execute_query(check_query, {
-            "source_id": request.source_id,
-            "target_id": request.target_id,
-            "relationship_type": request.relationship_type
-        })
-        
+
+        existing = state.graph._execute_query(
+            check_query,
+            {
+                "source_id": request.source_id,
+                "target_id": request.target_id,
+                "relationship_type": request.relationship_type,
+            },
+        )
+
         if not existing or len(existing) == 0:
             return EdgeReviewResponse(
-                success=False,
-                message="Edge not found",
-                updated_edge={}
+                success=False, message="Edge not found", updated_edge={}
             )
-        
+
         # Update edge status based on action
         new_status = "approved" if request.action == "approve" else "rejected"
-        
+
         update_query = """
         MATCH (source {id: $source_id})-[r]->(target {id: $target_id})
         WHERE type(r) = $relationship_type
@@ -319,15 +384,18 @@ async def review_edge(request: EdgeReviewRequest) -> EdgeReviewResponse:
             r.reviewer_notes = $reviewer_notes
         RETURN properties(r) as props
         """
-        
-        state.graph._execute_write(update_query, {
-            "source_id": request.source_id,
-            "target_id": request.target_id,
-            "relationship_type": request.relationship_type,
-            "status": new_status,
-            "reviewer_notes": request.reviewer_notes
-        })
-        
+
+        state.graph._execute_write(
+            update_query,
+            {
+                "source_id": request.source_id,
+                "target_id": request.target_id,
+                "relationship_type": request.relationship_type,
+                "status": new_status,
+                "reviewer_notes": request.reviewer_notes,
+            },
+        )
+
         return EdgeReviewResponse(
             success=True,
             message=f"Edge {request.action}d successfully",
@@ -335,10 +403,10 @@ async def review_edge(request: EdgeReviewRequest) -> EdgeReviewResponse:
                 "source": request.source_id,
                 "target": request.target_id,
                 "type": request.relationship_type,
-                "status": new_status
-            }
+                "status": new_status,
+            },
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Review failed: {e}")
 
@@ -346,61 +414,61 @@ async def review_edge(request: EdgeReviewRequest) -> EdgeReviewResponse:
 @router.post("/infer", response_model=LineageInferenceResponse)
 async def infer_lineage(request: LineageInferenceRequest) -> LineageInferenceResponse:
     """Trigger LLM-based lineage inference for a given scope.
-    
+
     Retrieves context (graph + code), asks LLM to propose edges,
     and returns the proposals. Proposals are auto-ingested as 'pending_review'.
-    
+
     Args:
         request: Inference request with scope and limits.
-        
+
     Returns:
         LineageInferenceResponse with generated proposals.
     """
     state = get_app_state()
-    
+
     if not state.inference_service:
-        raise HTTPException(status_code=503, detail="Lineage Inference Service not initialized")
-    
+        raise HTTPException(
+            status_code=503, detail="Lineage Inference Service not initialized"
+        )
+
     try:
         # 1. Retrieve Context
         context = await state.inference_service.retrieve_context(
             scope=request.scope,
             max_nodes=request.max_nodes,
             max_chunks=request.max_chunks,
-            project_id=request.project_id
+            project_id=request.project_id,
         )
-        
+
         node_count = len(context.get("nodes", []))
-        
+
         # 2. Propose Edges
         # Define edge types we are interested in (could be parameterized later)
         edge_types = ["DEPENDS_ON", "CALLS", "READS_FROM", "WRITES_TO"]
-        
+
         proposals = await state.inference_service.propose_edges(
-            context=context,
-            edge_types=edge_types
+            context=context, edge_types=edge_types
         )
-        
+
         # 3. Ingest Proposals
         if proposals:
             state.inference_service.ingest_proposals(
-                proposals=proposals,
-                default_status="pending_review"
+                proposals=proposals, default_status="pending_review"
             )
-            
+
         return LineageInferenceResponse(
             success=True,
             message=f"Inference complete. Generated {len(proposals)} proposals.",
             context_nodes_count=node_count,
             proposals_count=len(proposals),
-            proposals=proposals
+            proposals=proposals,
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference failed: {e}")
 
 
-@router.get("/node/{node_id}")
+@router.get("/node/{node_id:path}")
 async def get_node_lineage(
     node_id: str,
     direction: str = Query("both", pattern="^(upstream|downstream|both)$"),
@@ -426,6 +494,12 @@ async def get_node_lineage(
     try:
         nodes = []
         edges = []
+
+        if is_valid_urn(node_id):
+            resolved = _resolve_node_urn(state, node_id, project_id)
+            if not resolved:
+                raise HTTPException(status_code=404, detail="Node not found for URN")
+            node_id = resolved
 
         # Get the node itself
         entity = state.graph.get_entity(node_id)
@@ -490,3 +564,83 @@ async def get_node_lineage(
         return {"nodes": nodes, "edges": edges}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch lineage: {e}")
+
+
+@router.get("/edge/{edge_urn:path}")
+async def get_edge_detail(edge_urn: str) -> Dict[str, Any]:
+    """Resolve a lineage edge from a URN."""
+    state = get_app_state()
+
+    if not state.graph:
+        raise HTTPException(status_code=503, detail="Graph not initialized")
+
+    if not is_valid_urn(edge_urn):
+        raise HTTPException(status_code=422, detail="Invalid edge URN")
+
+    parts = parse_urn(edge_urn)
+    if parts["entity_type"] != "neo4j-edge":
+        raise HTTPException(status_code=422, detail="URN is not a neo4j-edge")
+
+    parsed = _parse_edge_asset_path(parts["asset_path"])
+    if not parsed:
+        raise HTTPException(status_code=422, detail="Invalid edge URN asset path")
+
+    if not all(
+        _is_safe_label(value)
+        for value in [
+            parsed["rel_type"],
+            parsed["source_label"],
+            parsed["target_label"],
+        ]
+    ):
+        raise HTTPException(status_code=422, detail="Invalid edge URN labels")
+
+    query = f"""
+    MATCH (source)-[r:{parsed['rel_type']}]->(target)
+    WHERE $source_label IN labels(source)
+      AND $target_label IN labels(target)
+      AND toLower(source.name) = toLower($source_name)
+      AND toLower(target.name) = toLower($target_name)
+      AND (source.project_id = $project_id OR $project_id IS NULL)
+      AND (target.project_id = $project_id OR $project_id IS NULL)
+    RETURN source, target, labels(source) as source_labels, labels(target) as target_labels,
+           properties(r) as metadata, type(r) as rel_type
+    LIMIT 1
+    """
+
+    results = state.graph._execute_query(
+        query,
+        {
+            "source_label": parsed["source_label"],
+            "target_label": parsed["target_label"],
+            "source_name": parsed["source_name"],
+            "target_name": parsed["target_name"],
+            "project_id": parts["project_id"],
+        },
+    )
+
+    if not results:
+        raise HTTPException(status_code=404, detail="Edge not found for URN")
+
+    record = results[0]
+    source_node = record["source"]
+    target_node = record["target"]
+
+    return {
+        "edge": {
+            "type": record.get("rel_type"),
+            "metadata": record.get("metadata", {}),
+            "source": {
+                "id": source_node.get("id"),
+                "label": source_node.get("name"),
+                "type": (record.get("source_labels") or ["Unknown"])[0],
+                "metadata": dict(source_node),
+            },
+            "target": {
+                "id": target_node.get("id"),
+                "label": target_node.get("name"),
+                "type": (record.get("target_labels") or ["Unknown"])[0],
+                "metadata": dict(target_node),
+            },
+        }
+    }

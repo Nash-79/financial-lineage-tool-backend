@@ -23,6 +23,7 @@ import httpx
 @dataclass
 class BenchmarkResult:
     """Result of a single benchmark run."""
+
     endpoint: str
     iterations: int
     latencies_ms: List[float]
@@ -156,18 +157,18 @@ class ChatBenchmark:
         results = {}
 
         # 1. Baseline: /api/chat/deep without optimizations
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("1. BASELINE: /api/chat/deep (cold, no session)")
-        print("="*60)
+        print("=" * 60)
         results["deep_cold"] = await self.benchmark_endpoint(
             "/api/chat/deep",
             iterations=iterations,
         )
 
         # 2. With session (memory context)
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("2. WITH MEMORY: /api/chat/deep (with session_id)")
-        print("="*60)
+        print("=" * 60)
         results["deep_with_memory"] = await self.benchmark_endpoint(
             "/api/chat/deep",
             iterations=iterations,
@@ -175,9 +176,9 @@ class ChatBenchmark:
         )
 
         # 3. With skip_memory flag
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("3. SKIP MEMORY: /api/chat/deep (skip_memory=true)")
-        print("="*60)
+        print("=" * 60)
         results["deep_skip_memory"] = await self.benchmark_endpoint(
             "/api/chat/deep",
             iterations=iterations,
@@ -186,9 +187,9 @@ class ChatBenchmark:
         )
 
         # 4. Repeated queries (cache hits)
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("4. CACHE HITS: /api/chat/deep (same query repeated)")
-        print("="*60)
+        print("=" * 60)
         # Use same query to test embedding cache
         single_query = self.TEST_QUERIES[0]
         cache_latencies = []
@@ -208,9 +209,9 @@ class ChatBenchmark:
         )
 
         # 5. Simple text endpoint (baseline LLM latency)
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("5. LLM BASELINE: /api/chat/text (no RAG)")
-        print("="*60)
+        print("=" * 60)
         results["text_baseline"] = await self.benchmark_endpoint(
             "/api/chat/text",
             iterations=iterations,
@@ -220,11 +221,13 @@ class ChatBenchmark:
 
     def print_summary(self, results: dict):
         """Print benchmark summary table."""
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("BENCHMARK SUMMARY")
-        print("="*80)
-        print(f"{'Endpoint':<35} {'P50':>10} {'P95':>10} {'P99':>10} {'Mean':>10} {'Errors':>8}")
-        print("-"*80)
+        print("=" * 80)
+        print(
+            f"{'Endpoint':<35} {'P50':>10} {'P95':>10} {'P99':>10} {'Mean':>10} {'Errors':>8}"
+        )
+        print("-" * 80)
 
         for name, result in results.items():
             print(
@@ -236,7 +239,7 @@ class ChatBenchmark:
                 f"{result.errors:>8}"
             )
 
-        print("-"*80)
+        print("-" * 80)
 
         # Calculate improvements
         if "deep_cold" in results and "deep_skip_memory" in results:
@@ -257,22 +260,20 @@ class ChatBenchmark:
 async def main():
     parser = argparse.ArgumentParser(description="Chat API Performance Benchmark")
     parser.add_argument(
-        "--iterations", "-n",
+        "--iterations",
+        "-n",
         type=int,
         default=10,
-        help="Number of iterations per benchmark (default: 10)"
+        help="Number of iterations per benchmark (default: 10)",
     )
     parser.add_argument(
-        "--base-url", "-u",
+        "--base-url",
+        "-u",
         type=str,
         default="http://localhost:8000",
-        help="Base URL of the API (default: http://localhost:8000)"
+        help="Base URL of the API (default: http://localhost:8000)",
     )
-    parser.add_argument(
-        "--output", "-o",
-        type=str,
-        help="Output JSON file for results"
-    )
+    parser.add_argument("--output", "-o", type=str, help="Output JSON file for results")
 
     args = parser.parse_args()
 

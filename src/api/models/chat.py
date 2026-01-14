@@ -13,10 +13,12 @@ class ChatRequest(BaseModel):
         default=None, description="Conversation history"
     )
     context: Optional[Dict[str, Any]] = None
-    session_id: Optional[str] = Field(None, description="Client session ID for memory context")
+    session_id: Optional[str] = Field(
+        None, description="Client session ID for memory context"
+    )
     skip_memory: bool = Field(
         default=False,
-        description="Skip memory context retrieval for faster response (saves ~300ms)"
+        description="Skip memory context retrieval for faster response (saves ~300ms)",
     )
 
 
@@ -24,8 +26,10 @@ class ChatResponse(BaseModel):
     """Response model for chat endpoints."""
 
     response: str
-    sources: List[Dict[str, Any]] = []
+    sources: List[Dict[str, Any]] = Field(default_factory=list)
     query_type: str
     latency_ms: float
-    graph_data: Optional[Dict[str, List[Dict[str, Any]]]] = None
     model: Optional[str] = None
+    next_actions: Optional[List[str]] = None
+    warnings: Optional[List[str]] = None
+    graph_data: Optional[Dict[str, List[Dict[str, Any]]]] = None

@@ -35,8 +35,7 @@ async def test_project(duckdb_client):
     """Create a test project."""
     project_store = ProjectStore()
     project = await project_store.create(
-        name="TestProject",
-        description="Test project for artifact manager"
+        name="TestProject", description="Test project for artifact manager"
     )
     return project
 
@@ -52,7 +51,7 @@ class TestArtifactManager:
         context = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="initial_ingest"
+            action="initial_ingest",
         )
 
         # Check context properties
@@ -73,7 +72,9 @@ class TestArtifactManager:
         assert metadata.status == "in_progress"
 
     @pytest.mark.asyncio
-    async def test_concurrent_runs_sequence(self, temp_data_dir, duckdb_client, test_project):
+    async def test_concurrent_runs_sequence(
+        self, temp_data_dir, duckdb_client, test_project
+    ):
         """Test sequence numbering for concurrent runs."""
         manager = ArtifactManager(base_path=temp_data_dir)
 
@@ -81,14 +82,14 @@ class TestArtifactManager:
         context1 = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="run1"
+            action="run1",
         )
 
         # Force same timestamp by creating immediately
         context2 = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="run2"
+            action="run2",
         )
 
         # Sequences should be different (or timestamps differ)
@@ -107,7 +108,7 @@ class TestArtifactManager:
         context = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="test"
+            action="test",
         )
 
         # Get artifact path
@@ -131,13 +132,13 @@ class TestArtifactManager:
         await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="run1"
+            action="run1",
         )
 
         await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="run2"
+            action="run2",
         )
 
         # List runs
@@ -156,7 +157,7 @@ class TestArtifactManager:
         context = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="test"
+            action="test",
         )
 
         # Complete the run
@@ -169,7 +170,9 @@ class TestArtifactManager:
         assert metadata.completed_at is not None
 
     @pytest.mark.asyncio
-    async def test_file_registration_new(self, temp_data_dir, duckdb_client, test_project):
+    async def test_file_registration_new(
+        self, temp_data_dir, duckdb_client, test_project
+    ):
         """Test registering a new file."""
         manager = ArtifactManager(base_path=temp_data_dir)
 
@@ -177,7 +180,7 @@ class TestArtifactManager:
         context = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="test"
+            action="test",
         )
 
         raw_dir = manager.get_artifact_path(context.run_id, "raw_source")
@@ -191,7 +194,7 @@ class TestArtifactManager:
             project_id=test_project["id"],
             run_id=context.run_id,
             filename="test.sql",
-            file_path=test_file
+            file_path=test_file,
         )
 
         assert result["status"] == "new_file"
@@ -201,7 +204,9 @@ class TestArtifactManager:
         assert len(result["file_hash"]) == 64  # SHA256 hex length
 
     @pytest.mark.asyncio
-    async def test_file_versioning_different_content(self, temp_data_dir, duckdb_client, test_project):
+    async def test_file_versioning_different_content(
+        self, temp_data_dir, duckdb_client, test_project
+    ):
         """Test file versioning when content changes."""
         manager = ArtifactManager(base_path=temp_data_dir)
 
@@ -209,7 +214,7 @@ class TestArtifactManager:
         context1 = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="upload1"
+            action="upload1",
         )
 
         raw_dir1 = manager.get_artifact_path(context1.run_id, "raw_source")
@@ -220,7 +225,7 @@ class TestArtifactManager:
             project_id=test_project["id"],
             run_id=context1.run_id,
             filename="schema.sql",
-            file_path=file1
+            file_path=file1,
         )
 
         assert result1["status"] == "new_file"
@@ -230,7 +235,7 @@ class TestArtifactManager:
         context2 = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="upload2"
+            action="upload2",
         )
 
         raw_dir2 = manager.get_artifact_path(context2.run_id, "raw_source")
@@ -241,7 +246,7 @@ class TestArtifactManager:
             project_id=test_project["id"],
             run_id=context2.run_id,
             filename="schema.sql",
-            file_path=file2
+            file_path=file2,
         )
 
         assert result2["status"] == "new_version"
@@ -258,7 +263,9 @@ class TestArtifactManager:
         assert history[1].superseded_by == context2.run_id
 
     @pytest.mark.asyncio
-    async def test_content_deduplication(self, temp_data_dir, duckdb_client, test_project):
+    async def test_content_deduplication(
+        self, temp_data_dir, duckdb_client, test_project
+    ):
         """Test content-based deduplication with identical files."""
         manager = ArtifactManager(base_path=temp_data_dir)
 
@@ -266,7 +273,7 @@ class TestArtifactManager:
         context1 = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="upload1"
+            action="upload1",
         )
 
         raw_dir1 = manager.get_artifact_path(context1.run_id, "raw_source")
@@ -277,7 +284,7 @@ class TestArtifactManager:
             project_id=test_project["id"],
             run_id=context1.run_id,
             filename="data.sql",
-            file_path=file1
+            file_path=file1,
         )
 
         assert result1["status"] == "new_file"
@@ -287,7 +294,7 @@ class TestArtifactManager:
         context2 = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="upload2"
+            action="upload2",
         )
 
         raw_dir2 = manager.get_artifact_path(context2.run_id, "raw_source")
@@ -298,7 +305,7 @@ class TestArtifactManager:
             project_id=test_project["id"],
             run_id=context2.run_id,
             filename="data.sql",
-            file_path=file2
+            file_path=file2,
         )
 
         # Should detect duplicate and skip processing
@@ -317,7 +324,7 @@ class TestArtifactManager:
             context = await manager.create_run(
                 project_id=test_project["id"],
                 project_name=test_project["name"],
-                action=f"upload{i+1}"
+                action=f"upload{i+1}",
             )
 
             raw_dir = manager.get_artifact_path(context.run_id, "raw_source")
@@ -328,7 +335,7 @@ class TestArtifactManager:
                 project_id=test_project["id"],
                 run_id=context.run_id,
                 filename="report.sql",
-                file_path=file
+                file_path=file,
             )
 
         # Get latest version
@@ -350,7 +357,7 @@ class TestArtifactManager:
             context = await manager.create_run(
                 project_id=test_project["id"],
                 project_name=test_project["name"],
-                action=f"upload{i+1}"
+                action=f"upload{i+1}",
             )
 
             raw_dir = manager.get_artifact_path(context.run_id, "raw_source")
@@ -361,7 +368,7 @@ class TestArtifactManager:
                 project_id=test_project["id"],
                 run_id=context.run_id,
                 filename="changelog.sql",
-                file_path=file
+                file_path=file,
             )
 
         # Get history
@@ -370,18 +377,20 @@ class TestArtifactManager:
 
         # Should be ordered newest first
         assert history[0].is_superseded is False  # Latest version
-        assert history[1].is_superseded is True   # Superseded
-        assert history[2].is_superseded is True   # Superseded
+        assert history[1].is_superseded is True  # Superseded
+        assert history[2].is_superseded is True  # Superseded
 
     @pytest.mark.asyncio
-    async def test_mark_file_processed(self, temp_data_dir, duckdb_client, test_project):
+    async def test_mark_file_processed(
+        self, temp_data_dir, duckdb_client, test_project
+    ):
         """Test marking file as processed."""
         manager = ArtifactManager(base_path=temp_data_dir)
 
         context = await manager.create_run(
             project_id=test_project["id"],
             project_name=test_project["name"],
-            action="test"
+            action="test",
         )
 
         raw_dir = manager.get_artifact_path(context.run_id, "raw_source")
@@ -392,7 +401,7 @@ class TestArtifactManager:
             project_id=test_project["id"],
             run_id=context.run_id,
             filename="test.sql",
-            file_path=test_file
+            file_path=test_file,
         )
 
         file_id = result["file_id"]
@@ -410,15 +419,13 @@ class TestArtifactManager:
         project_store = ProjectStore()
         project = await project_store.create(
             name="Test/Project\\With:Invalid*Chars?",
-            description="Test special characters"
+            description="Test special characters",
         )
 
         manager = ArtifactManager(base_path=temp_data_dir)
 
         context = await manager.create_run(
-            project_id=project["id"],
-            project_name=project["name"],
-            action="test"
+            project_id=project["id"], project_name=project["name"], action="test"
         )
 
         # Directory should be created with sanitized name

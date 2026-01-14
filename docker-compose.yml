@@ -78,6 +78,7 @@ services:
     volumes:
       - ./src:/app/src:ro
       - ./config:/app/config:ro
+      - ./demo_data:/app/demo_data:ro
       - ./data:/app/data:rw
       - ./logs:/app/logs
     depends_on:

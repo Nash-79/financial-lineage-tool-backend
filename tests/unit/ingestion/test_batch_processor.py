@@ -2,7 +2,7 @@
 
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
 from src.ingestion.batch_processor import BatchProcessor
 
 
@@ -18,7 +18,7 @@ class TestBatchProcessor(unittest.IsolatedAsyncioTestCase):
         self.processor = BatchProcessor(
             process_callback=self.mock_callback,
             debounce_window=0.1,  # 100ms for testing
-            batch_size_threshold=3
+            batch_size_threshold=3,
         )
 
     async def asyncTearDown(self):
@@ -88,8 +88,7 @@ class TestBatchProcessor(unittest.IsolatedAsyncioTestCase):
     async def test_batching_disabled_immediate_processing(self):
         """Test immediate processing when batching disabled."""
         processor = BatchProcessor(
-            process_callback=self.mock_callback,
-            enable_batching=False
+            process_callback=self.mock_callback, enable_batching=False
         )
 
         await processor.add_event("file1.sql")
@@ -175,10 +174,7 @@ class TestBatchProcessor(unittest.IsolatedAsyncioTestCase):
         """Test error handling in callback."""
         error_callback = AsyncMock(side_effect=Exception("Processing error"))
 
-        processor = BatchProcessor(
-            process_callback=error_callback,
-            debounce_window=0.1
-        )
+        processor = BatchProcessor(process_callback=error_callback, debounce_window=0.1)
 
         await processor.add_event("file1.sql")
 
@@ -205,5 +201,5 @@ class TestBatchProcessor(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stats["batches_processed"], 2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

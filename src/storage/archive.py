@@ -8,7 +8,7 @@ Archives can be queried directly using DuckDB's Parquet reader.
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from .duckdb_client import get_duckdb_client
 
@@ -32,8 +32,7 @@ def get_archive_dir(archive_month: Optional[str] = None) -> Path:
 
 
 def export_to_parquet(
-    archive_month: Optional[str] = None,
-    tables: Optional[list[str]] = None
+    archive_month: Optional[str] = None, tables: Optional[list[str]] = None
 ) -> dict:
     """
     Export metadata tables to Parquet files.
@@ -80,10 +79,12 @@ def export_to_parquet(
                 continue
 
             # Export using DuckDB COPY TO with Snappy compression
-            client.execute_read(f"""
+            client.execute_read(
+                f"""
                 COPY {table} TO '{output_path}'
                 (FORMAT PARQUET, COMPRESSION SNAPPY)
-            """)
+            """
+            )
 
             # Get file size
             file_size = output_path.stat().st_size if output_path.exists() else 0
@@ -108,9 +109,7 @@ def export_to_parquet(
 
 
 def query_archived_parquet(
-    archive_month: str,
-    query: str,
-    table: str = "projects"
+    archive_month: str, query: str, table: str = "projects"
 ) -> list[tuple]:
     """
     Query archived Parquet files using DuckDB.
@@ -138,10 +137,12 @@ def query_archived_parquet(
         return []
 
     try:
-        result = client.fetchall(f"""
+        result = client.fetchall(
+            f"""
             SELECT * FROM read_parquet('{parquet_path}')
             WHERE {query}
-        """)
+        """
+        )
         return result
     except Exception as e:
         logger.error(f"Failed to query archive: {e}")
@@ -169,20 +170,20 @@ def list_archives() -> list[dict]:
         parquet_files = list(month_dir.glob("*.parquet"))
         total_size = sum(f.stat().st_size for f in parquet_files)
 
-        archives.append({
-            "month": month_dir.name,
-            "file_count": len(parquet_files),
-            "total_size_bytes": total_size,
-            "files": [f.name for f in parquet_files],
-        })
+        archives.append(
+            {
+                "month": month_dir.name,
+                "file_count": len(parquet_files),
+                "total_size_bytes": total_size,
+                "files": [f.name for f in parquet_files],
+            }
+        )
 
     return archives
 
 
 def query_across_archives(
-    query: str,
-    table: str = "projects",
-    months: Optional[list[str]] = None
+    query: str, table: str = "projects", months: Optional[list[str]] = None
 ) -> list[tuple]:
     """
     Query across multiple archived Parquet files using UNION.
@@ -219,21 +220,19 @@ def query_across_archives(
     try:
         # Use DuckDB's ability to read multiple Parquet files
         files_list = ", ".join(f"'{f}'" for f in parquet_files)
-        result = client.fetchall(f"""
+        result = client.fetchall(
+            f"""
             SELECT * FROM read_parquet([{files_list}])
             WHERE {query}
-        """)
+        """
+        )
         return result
     except Exception as e:
         logger.error(f"Failed to query archives: {e}")
         raise
 
 
-def cleanup_old_data(
-    archive_month: str,
-    table: str,
-    filter_query: str
-) -> int:
+def cleanup_old_data(archive_month: str, table: str, filter_query: str) -> int:
     """
     Delete data from active DuckDB table after successful archive.
 
@@ -251,7 +250,9 @@ def cleanup_old_data(
 
     try:
         # Get count before delete
-        count_result = client.fetchone(f"SELECT COUNT(*) FROM {table} WHERE {filter_query}")
+        count_result = client.fetchone(
+            f"SELECT COUNT(*) FROM {table} WHERE {filter_query}"
+        )
         count = count_result[0] if count_result else 0
 
         if count > 0:

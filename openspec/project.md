@@ -31,6 +31,12 @@ Financial Lineage Tool - A RAG-powered backend service for analyzing SQL databas
 - Service layer for business logic
 - RESTful API design with OpenAPI/Swagger docs
 
+### URN Format
+- All graph node IDs use the URN schema: `urn:li:{entity_type}:{project_id}:{asset_path}`
+- Examples:
+  - `urn:li:dataset:finance_repo:prod_db.dim_users`
+  - `urn:li:file:etl_service:src/transform.py`
+
 ### Testing Strategy
 - Unit tests with pytest
 - Async tests with pytest-asyncio

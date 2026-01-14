@@ -8,6 +8,7 @@ import json
 
 API_BASE = "http://localhost:8000"
 
+
 def test_health():
     """Test the health endpoint."""
     print("=" * 60)
@@ -17,6 +18,7 @@ def test_health():
     print(f"Status Code: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2)}")
     print()
+
 
 def test_graph_stats():
     """Test graph statistics."""
@@ -28,6 +30,7 @@ def test_graph_stats():
     print(f"Response: {json.dumps(response.json(), indent=2)}")
     print()
 
+
 def test_simple_query():
     """Test a simple lineage query."""
     print("=" * 60)
@@ -35,19 +38,14 @@ def test_simple_query():
     print("=" * 60)
 
     # This will use your local Ollama model
-    query = {
-        "question": "What is data lineage?",
-        "include_validation": False
-    }
+    query = {"question": "What is data lineage?", "include_validation": False}
 
     print(f"Query: {query['question']}")
     print("Sending request to Ollama (this may take 10-30 seconds)...")
 
     try:
         response = requests.post(
-            f"{API_BASE}/api/v1/lineage/query",
-            json=query,
-            timeout=60
+            f"{API_BASE}/api/v1/lineage/query", json=query, timeout=60
         )
         print(f"Status Code: {response.status_code}")
 
@@ -66,6 +64,7 @@ def test_simple_query():
         print(f"Error: {e}")
     print()
 
+
 if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("Financial Lineage Tool - Local API Tests")
@@ -82,7 +81,7 @@ if __name__ == "__main__":
     print()
 
     user_input = input("Do you want to test a query with Ollama? (y/n): ")
-    if user_input.lower() == 'y':
+    if user_input.lower() == "y":
         test_simple_query()
 
     print("\n" + "=" * 60)

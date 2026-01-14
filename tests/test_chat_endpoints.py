@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from src.api.main_local import app
 
@@ -51,20 +50,23 @@ def test_chat_deep_endpoint():
 
 def test_chat_deep_with_session_id():
     """Test deep chat with session ID for memory context."""
-    response = client.post("/api/chat/deep", json={
-        "query": "What tables exist?",
-        "session_id": "test-session-123"
-    })
+    response = client.post(
+        "/api/chat/deep",
+        json={"query": "What tables exist?", "session_id": "test-session-123"},
+    )
     assert response.status_code in [200, 500, 503]
 
 
 def test_chat_deep_with_skip_memory():
     """Test deep chat with skip_memory flag."""
-    response = client.post("/api/chat/deep", json={
-        "query": "What tables exist?",
-        "session_id": "test-session-123",
-        "skip_memory": True
-    })
+    response = client.post(
+        "/api/chat/deep",
+        json={
+            "query": "What tables exist?",
+            "session_id": "test-session-123",
+            "skip_memory": True,
+        },
+    )
     assert response.status_code in [200, 500, 503]
 
 
@@ -82,12 +84,14 @@ def test_chat_deep_whitespace_query_returns_422():
 
 def test_chat_title_endpoint():
     """Test title generation endpoint."""
-    response = client.post("/api/chat/title", json={"query": "What is the lineage of customers table?"})
+    response = client.post(
+        "/api/chat/title", json={"query": "What is the lineage of customers table?"}
+    )
     assert response.status_code in [200, 500, 503]
     if response.status_code == 200:
         data = response.json()
-        assert "title" in data
-        assert isinstance(data["title"], str)
+        assert "response" in data
+        assert data["query_type"] == "title"
 
 
 def test_chat_session_delete():

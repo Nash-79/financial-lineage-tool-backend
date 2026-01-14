@@ -7,10 +7,12 @@ Supports DuckDB SQL dialect features like QUALIFY, LIST aggregation, and JSON op
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import duckdb
+from src.storage.snapshot_manager import SnapshotManager
 
 logger = logging.getLogger(__name__)
 
@@ -27,23 +29,42 @@ class DuckDBClient:
     DuckDB supports concurrent reads natively (MVCC).
     """
 
-    def __init__(self, db_path: str = "data/metadata.duckdb"):
+    def __init__(
+        self,
+        db_path: str = "data/metadata.duckdb",
+        enable_snapshots: bool = True,
+        snapshot_keep_count: int = 5,
+        snapshots_dir: str = "data/snapshots",
+    ):
         """
         Initialize DuckDB client.
 
         Args:
             db_path: Path to DuckDB database file, or ":memory:" for in-memory.
+            enable_snapshots: Enable automatic snapshots for in-memory mode (default: True)
         """
         self.db_path = db_path
         self.conn: Optional[duckdb.DuckDBPyConnection] = None
         self._write_lock = asyncio.Lock()
         self._initialized = False
+        self._is_memory_mode = db_path == ":memory:"
+
+        # Initialize snapshot manager for in-memory mode
+        self.snapshot_manager: Optional[SnapshotManager] = None
+        self._pending_snapshot = False  # Track if snapshot is needed
+        if self._is_memory_mode and enable_snapshots:
+            self.snapshot_manager = SnapshotManager(
+                snapshots_dir=snapshots_dir,
+                keep_count=snapshot_keep_count,
+            )
+            logger.info("Snapshot manager enabled for in-memory mode")
 
     def initialize(self) -> None:
         """
         Initialize DuckDB connection and create schema.
 
-        Creates the database file if it doesn't exist (for persistent mode).
+        For persistent mode: Creates database file if it doesn't exist.
+        For in-memory mode: Loads latest snapshot if available.
         Creates all required tables, indexes, and constraints.
         """
         if self._initialized:
@@ -51,30 +72,58 @@ class DuckDBClient:
             return
 
         # Create parent directory for persistent databases
-        if self.db_path != ":memory:":
+        if not self._is_memory_mode:
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
             logger.info(f"Initializing persistent DuckDB at: {self.db_path}")
         else:
             logger.info("Initializing in-memory DuckDB")
 
-        # Connect to database with retry mechanism
-        import time
-        max_retries = 5
-        retry_delay = 1.0
+        # Connect to database
+        if not self._is_memory_mode:
+            # Persistent mode: Connect with retry mechanism for file locking
+            import time
 
-        for attempt in range(1, max_retries + 1):
-            try:
-                self.conn = duckdb.connect(self.db_path)
-                break
-            except (duckdb.Error, OSError) as e:
-                if attempt == max_retries:
-                    logger.error(f"Failed to connect to DuckDB after {max_retries} attempts: {e}")
-                    raise
-                logger.warning(f"DuckDB connection attempt {attempt} failed ({e}). Retrying in {retry_delay}s...")
-                time.sleep(retry_delay)
+            max_retries = 5
+            retry_delay = 1.0
 
-        # Create schema
+            for attempt in range(1, max_retries + 1):
+                try:
+                    self.conn = duckdb.connect(self.db_path)
+                    break
+                except (duckdb.Error, OSError) as e:
+                    if attempt == max_retries:
+                        logger.error(
+                            f"Failed to connect to DuckDB after {max_retries} attempts: {e}"
+                        )
+                        raise
+                    logger.warning(
+                        f"DuckDB connection attempt {attempt} failed ({e}). Retrying in {retry_delay}s..."
+                    )
+                    time.sleep(retry_delay)
+        else:
+            # In-memory mode: Connect immediately (no file locking issues)
+            self.conn = duckdb.connect(":memory:")
+
+        # Load latest snapshot for in-memory mode before applying migrations
+        if self._is_memory_mode and self.snapshot_manager:
+            latest_snapshot = self.snapshot_manager.get_latest_snapshot()
+            if latest_snapshot:
+                try:
+                    logger.info(
+                        f"Loading latest snapshot: {os.path.basename(latest_snapshot)}"
+                    )
+                    self.snapshot_manager.load_snapshot(self.conn, latest_snapshot)
+                    logger.info("Snapshot loaded successfully")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to load snapshot, starting with empty database: {e}"
+                    )
+            else:
+                logger.info("No snapshot found, starting with empty database")
+
+        # Create schema / apply migrations
         self._create_schema()
+
         self._initialized = True
         logger.info("DuckDB initialization complete")
 
@@ -84,17 +133,19 @@ class DuckDBClient:
             raise RuntimeError("DuckDB connection not initialized")
 
         # Schema version tracking
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS schema_version (
                 version INTEGER PRIMARY KEY,
                 applied_at TIMESTAMP DEFAULT current_timestamp
             )
-        """)
+        """
+        )
 
         # Check current version
         result = self.conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
         current_version = result[0] if result and result[0] else 0
-        target_version = 4
+        target_version = 6
 
         # Migration status banner
         logger.info("=" * 70)
@@ -125,15 +176,39 @@ class DuckDBClient:
             # V3: Add runs and files tables for artifact management
             self._migrate_to_v3()
             self.conn.execute("INSERT INTO schema_version (version) VALUES (3)")
-            logger.info("✓ Migration 2 → 3 completed successfully (artifact management)")
+            logger.info(
+                "✓ Migration 2 → 3 completed successfully (artifact management)"
+            )
             current_version = 3
 
         if current_version == 3:
             # V4: Add upload_settings table for persistent configuration
             self._migrate_to_v4()
             self.conn.execute("INSERT INTO schema_version (version) VALUES (4)")
-            logger.info("✓ Migration 3 → 4 completed successfully (upload settings persistence)")
+            logger.info(
+                "✓ Migration 3 → 4 completed successfully (upload settings persistence)"
+            )
             current_version = 4
+
+        if current_version == 4:
+            # V5: Add file metadata columns for frontend wiring
+            self._migrate_to_v5()
+            self.conn.execute("INSERT INTO schema_version (version) VALUES (5)")
+            logger.info(
+                "Migration 4 -> 5 completed successfully (file metadata columns)"
+            )
+            current_version = 5
+
+        if current_version == 5:
+            # V6: Rebuild files table without primary key + add project links
+            self._migrate_to_v6()
+            self.conn.execute("INSERT INTO schema_version (version) VALUES (6)")
+            logger.info(
+                "Migration 5 -> 6 completed successfully (files table rebuild + project links)"
+            )
+            current_version = 6
+
+        self._ensure_file_macros()
 
         # Completion banner
         logger.info("=" * 70)
@@ -164,16 +239,20 @@ class DuckDBClient:
             raise RuntimeError("DuckDB connection not initialized")
 
         # Add context column (JSON for structured context)
-        self.conn.execute("""
+        self.conn.execute(
+            """
             ALTER TABLE projects
             ADD COLUMN IF NOT EXISTS context JSON
-        """)
+        """
+        )
 
         # Add context file path column
-        self.conn.execute("""
+        self.conn.execute(
+            """
             ALTER TABLE projects
             ADD COLUMN IF NOT EXISTS context_file_path VARCHAR
-        """)
+        """
+        )
 
         logger.info("Added context and context_file_path columns to projects table")
 
@@ -197,9 +276,9 @@ class DuckDBClient:
         - CREATE INDEX idx_files_run
         - CREATE MACRO get_next_sequence(proj_id, ts)
           Purpose: Get next sequence number for concurrent runs
-        - CREATE MACRO find_duplicate_file(proj_id, fname, fhash)
+        - CREATE MACRO find_duplicate_file(proj_id, repo_id, rel_path, fhash)
           Purpose: Find duplicate files by content hash
-        - CREATE MACRO find_previous_file_version(proj_id, fname)
+        - CREATE MACRO find_previous_file_version(proj_id, repo_id, rel_path)
           Purpose: Find previous version of a file for superseding
 
         DATA MIGRATION: None (new tables)
@@ -211,7 +290,8 @@ class DuckDBClient:
             raise RuntimeError("DuckDB connection not initialized")
 
         # Create runs table
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS runs (
                 id VARCHAR PRIMARY KEY,
                 project_id VARCHAR NOT NULL,
@@ -224,12 +304,14 @@ class DuckDBClient:
                 error_message VARCHAR,
                 FOREIGN KEY (project_id) REFERENCES projects(id)
             )
-        """)
+        """
+        )
 
         # Create files table
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS files (
-                id VARCHAR PRIMARY KEY,
+                id VARCHAR NOT NULL,
                 project_id VARCHAR NOT NULL,
                 run_id VARCHAR NOT NULL,
                 filename VARCHAR NOT NULL,
@@ -243,51 +325,67 @@ class DuckDBClient:
                 FOREIGN KEY (project_id) REFERENCES projects(id),
                 FOREIGN KEY (run_id) REFERENCES runs(id)
             )
-        """)
+        """
+        )
 
         # Create indexes for performance
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_project_timestamp ON runs(project_id, timestamp)")
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_files_project_filename ON files(project_id, filename)")
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_files_hash ON files(file_hash)")
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_files_project_hash ON files(project_id, filename, file_hash)")
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_runs_project_timestamp ON runs(project_id, timestamp)"
+        )
+        self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_files_id ON files(id)")
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_project_filename ON files(project_id, filename)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_hash ON files(file_hash)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_project_hash ON files(project_id, filename, file_hash)"
+        )
         self.conn.execute("CREATE INDEX IF NOT EXISTS idx_files_run ON files(run_id)")
 
         # Create stored procedures and functions for metadata operations
         # Note: DuckDB uses CREATE OR REPLACE MACRO for functions
-        
+
         # Function: Get next sequence number for a run
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE OR REPLACE MACRO get_next_sequence(proj_id, ts) AS (
                 SELECT COALESCE(MAX(sequence), 0) + 1
                 FROM runs
                 WHERE project_id = proj_id AND timestamp = ts
             )
-        """)
+        """
+        )
 
         # Function: Find duplicate file by hash
-        self.conn.execute("""
-            CREATE OR REPLACE MACRO find_duplicate_file(proj_id, fname, fhash) AS TABLE (
+        self.conn.execute(
+            """
+            CREATE OR REPLACE MACRO find_duplicate_file(proj_id, repo_id, rel_path, fhash) AS TABLE (
                 SELECT id, run_id, file_path
                 FROM files
-                WHERE project_id = proj_id 
-                  AND filename = fname 
-                  AND file_hash = fhash 
+                WHERE project_id = proj_id
+                  AND filename = rel_path
+                  AND file_hash = fhash
                   AND is_superseded = false
                 LIMIT 1
             )
-        """)
+        """
+        )
 
         # Function: Find previous version of a file (same filename, different hash)
-        self.conn.execute("""
-            CREATE OR REPLACE MACRO find_previous_file_version(proj_id, fname) AS TABLE (
+        self.conn.execute(
+            """
+            CREATE OR REPLACE MACRO find_previous_file_version(proj_id, repo_id, rel_path) AS TABLE (
                 SELECT id, run_id, file_hash
                 FROM files
-                WHERE project_id = proj_id 
-                  AND filename = fname 
+                WHERE project_id = proj_id
+                  AND filename = rel_path
                   AND is_superseded = false
                 LIMIT 1
             )
-        """)
+        """
+        )
 
         logger.info("Created runs and files tables with indexes and stored procedures")
 
@@ -316,7 +414,8 @@ class DuckDBClient:
             raise RuntimeError("DuckDB connection not initialized")
 
         # Create upload_settings table
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS upload_settings (
                 id VARCHAR PRIMARY KEY DEFAULT 'default',
                 allowed_extensions VARCHAR NOT NULL,
@@ -324,9 +423,278 @@ class DuckDBClient:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_by VARCHAR
             )
-        """)
+        """
+        )
 
         logger.info("Created upload_settings table for persistent configuration")
+
+    def _migrate_to_v5(self) -> None:
+        """
+        Migrate schema from v4 to v5: Add file metadata columns for frontend wiring.
+
+        WHAT: Add relative_path, file_type, source, repository_id, status to files table
+        WHY: Support file listing, filtering, and path preservation in UI
+        WHEN: 2026-01-09 (align-frontend-backend-api OpenSpec change)
+
+        SCHEMA CHANGES:
+        - ALTER TABLE files ADD COLUMN relative_path
+        - ALTER TABLE files ADD COLUMN file_type
+        - ALTER TABLE files ADD COLUMN source
+        - ALTER TABLE files ADD COLUMN repository_id
+        - ALTER TABLE files ADD COLUMN status
+        - CREATE INDEX idx_files_project_relative_path
+        - CREATE INDEX idx_files_repository
+        - CREATE INDEX idx_files_source
+        - CREATE INDEX idx_files_status
+        - CREATE OR REPLACE MACRO find_duplicate_file(...)
+        - CREATE OR REPLACE MACRO find_previous_file_version(...)
+
+        DATA MIGRATION: None (additive columns)
+        ROLLBACK: Not needed (additive change only)
+        RISK LEVEL: Low (additive columns, new indexes)
+        AFFECTED FEATURES: File listing, ingestion metadata, UI wiring
+        """
+        if not self.conn:
+            raise RuntimeError("DuckDB connection not initialized")
+
+        # Drop dependent macros before altering table schema.
+        self.conn.execute("DROP MACRO IF EXISTS find_duplicate_file")
+        self.conn.execute("DROP MACRO IF EXISTS find_previous_file_version")
+
+        self.conn.execute(
+            """
+            ALTER TABLE files
+            ADD COLUMN IF NOT EXISTS relative_path VARCHAR
+        """
+        )
+        self.conn.execute(
+            """
+            ALTER TABLE files
+            ADD COLUMN IF NOT EXISTS file_type VARCHAR
+        """
+        )
+        self.conn.execute(
+            """
+            ALTER TABLE files
+            ADD COLUMN IF NOT EXISTS source VARCHAR
+        """
+        )
+        self.conn.execute(
+            """
+            ALTER TABLE files
+            ADD COLUMN IF NOT EXISTS repository_id VARCHAR
+        """
+        )
+        self.conn.execute(
+            """
+            ALTER TABLE files
+            ADD COLUMN IF NOT EXISTS status VARCHAR
+        """
+        )
+
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_project_relative_path ON files(project_id, relative_path)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_repository ON files(repository_id)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_source ON files(source)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_status ON files(status)"
+        )
+
+        self.conn.execute(
+            """
+            CREATE OR REPLACE MACRO find_duplicate_file(proj_id, repo_id, rel_path, fhash) AS TABLE (
+                SELECT id, run_id, file_path
+                FROM files
+                WHERE project_id = proj_id
+                  AND (repository_id = repo_id OR (repository_id IS NULL AND repo_id IS NULL))
+                  AND COALESCE(relative_path, filename) = rel_path
+                  AND file_hash = fhash
+                  AND is_superseded = false
+                LIMIT 1
+            )
+        """
+        )
+
+        self.conn.execute(
+            """
+            CREATE OR REPLACE MACRO find_previous_file_version(proj_id, repo_id, rel_path) AS TABLE (
+                SELECT id, run_id, file_hash
+                FROM files
+                WHERE project_id = proj_id
+                  AND (repository_id = repo_id OR (repository_id IS NULL AND repo_id IS NULL))
+                  AND COALESCE(relative_path, filename) = rel_path
+                  AND is_superseded = false
+                LIMIT 1
+            )
+        """
+        )
+
+        logger.info("Added file metadata columns and updated file versioning macros")
+
+    def _migrate_to_v6(self) -> None:
+        """
+        Migrate schema from v5 to v6: Rebuild files table without primary key and add project links.
+
+        WHAT: Remove DuckDB primary key on files.id to avoid constraint update issues.
+        WHY: DuckDB raises false constraint errors on UPDATE with PRIMARY KEY in some builds.
+        WHEN: 2026-01-13 (enhance-zero-cost-hybrid-lineage updates)
+
+        SCHEMA CHANGES:
+        - Recreate files table without PRIMARY KEY (use UNIQUE index instead)
+        - CREATE UNIQUE INDEX idx_files_id ON files(id)
+        - CREATE TABLE project_links for cross-project relationships
+        - CREATE INDEX idx_project_links_source/target
+
+        DATA MIGRATION: Copy files data into rebuilt table
+        ROLLBACK: Not supported (manual)
+        RISK LEVEL: Medium (table rebuild)
+        """
+        if not self.conn:
+            raise RuntimeError("DuckDB connection not initialized")
+
+        # Drop macros that depend on files table before rebuilding.
+        self.conn.execute("DROP MACRO IF EXISTS find_duplicate_file")
+        self.conn.execute("DROP MACRO IF EXISTS find_previous_file_version")
+
+        # Rebuild files table without primary key.
+        self.conn.execute("DROP TABLE IF EXISTS files_new")
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS files_new (
+                id VARCHAR NOT NULL,
+                project_id VARCHAR NOT NULL,
+                repository_id VARCHAR,
+                run_id VARCHAR NOT NULL,
+                filename VARCHAR NOT NULL,
+                relative_path VARCHAR,
+                file_type VARCHAR,
+                source VARCHAR,
+                status VARCHAR,
+                file_path VARCHAR NOT NULL,
+                file_hash VARCHAR(64) NOT NULL,
+                file_size_bytes BIGINT NOT NULL,
+                is_superseded BOOLEAN DEFAULT false,
+                superseded_by VARCHAR,
+                created_at TIMESTAMP DEFAULT current_timestamp,
+                processed_at TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id),
+                FOREIGN KEY (run_id) REFERENCES runs(id)
+            )
+        """
+        )
+
+        self.conn.execute(
+            """
+            INSERT INTO files_new (
+                id, project_id, repository_id, run_id, filename, relative_path,
+                file_type, source, status, file_path, file_hash, file_size_bytes,
+                is_superseded, superseded_by, created_at, processed_at
+            )
+            SELECT
+                id, project_id, repository_id, run_id, filename, relative_path,
+                file_type, source, status, file_path, file_hash, file_size_bytes,
+                is_superseded, superseded_by, created_at, processed_at
+            FROM files
+        """
+        )
+
+        self.conn.execute("DROP TABLE files")
+        self.conn.execute("ALTER TABLE files_new RENAME TO files")
+
+        # Recreate indexes for files table.
+        self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_files_id ON files(id)")
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_project_filename ON files(project_id, filename)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_hash ON files(file_hash)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_project_hash ON files(project_id, filename, file_hash)"
+        )
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_files_run ON files(run_id)")
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_project_relative_path ON files(project_id, relative_path)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_repository ON files(repository_id)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_source ON files(source)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_status ON files(status)"
+        )
+
+        # Create project_links table for cross-project links.
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS project_links (
+                id VARCHAR PRIMARY KEY,
+                source_project_id VARCHAR NOT NULL,
+                target_project_id VARCHAR NOT NULL,
+                link_type VARCHAR NOT NULL,
+                description VARCHAR,
+                created_at TIMESTAMP DEFAULT current_timestamp,
+                FOREIGN KEY (source_project_id) REFERENCES projects(id),
+                FOREIGN KEY (target_project_id) REFERENCES projects(id)
+            )
+        """
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_project_links_source ON project_links(source_project_id)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_project_links_target ON project_links(target_project_id)"
+        )
+
+        logger.info(
+            "Rebuilt files table without primary key and created project_links table"
+        )
+
+    def _ensure_file_macros(self) -> None:
+        """Ensure file deduplication macros use repository-aware signatures."""
+        if not self.conn:
+            raise RuntimeError("DuckDB connection not initialized")
+
+        try:
+            self.conn.execute("DROP MACRO IF EXISTS find_duplicate_file")
+            self.conn.execute("DROP MACRO IF EXISTS find_previous_file_version")
+            self.conn.execute(
+                """
+                CREATE OR REPLACE MACRO find_duplicate_file(proj_id, repo_id, rel_path, fhash) AS TABLE (
+                    SELECT id, run_id, file_path
+                    FROM files
+                    WHERE project_id = proj_id
+                      AND (repository_id = repo_id OR (repository_id IS NULL AND repo_id IS NULL))
+                      AND COALESCE(relative_path, filename) = rel_path
+                      AND file_hash = fhash
+                      AND is_superseded = false
+                    LIMIT 1
+                )
+            """
+            )
+
+            self.conn.execute(
+                """
+                CREATE OR REPLACE MACRO find_previous_file_version(proj_id, repo_id, rel_path) AS TABLE (
+                    SELECT id, run_id, file_hash
+                    FROM files
+                    WHERE project_id = proj_id
+                      AND (repository_id = repo_id OR (repository_id IS NULL AND repo_id IS NULL))
+                      AND COALESCE(relative_path, filename) = rel_path
+                      AND is_superseded = false
+                    LIMIT 1
+                )
+            """
+            )
+        except Exception as exc:
+            logger.warning("Failed to ensure file macros: %s", exc)
 
     def get_migration_status(self) -> Dict[str, Any]:
         """
@@ -342,10 +710,10 @@ class DuckDBClient:
 
         Example:
             {
-                "current_version": 4,
-                "latest_version": 4,
+                "current_version": 5,
+                "latest_version": 5,
                 "is_current": True,
-                "total_migrations": 4,
+                "total_migrations": 5,
                 "migrations": [
                     {"version": 1, "applied_at": "2026-01-03T12:00:00"},
                     {"version": 2, "applied_at": "2026-01-03T12:00:01"},
@@ -361,7 +729,7 @@ class DuckDBClient:
         ).fetchall()
 
         current_version = result[-1][0] if result else 0
-        latest_version = 4  # Update when new migrations added
+        latest_version = 6  # Update when new migrations added
 
         return {
             "current_version": current_version,
@@ -369,14 +737,10 @@ class DuckDBClient:
             "is_current": current_version == latest_version,
             "total_migrations": len(result),
             "migrations": [
-                {
-                    "version": r[0],
-                    "applied_at": r[1].isoformat() if r[1] else None
-                }
+                {"version": r[0], "applied_at": r[1].isoformat() if r[1] else None}
                 for r in result
-            ]
+            ],
         }
-
 
     def _create_initial_schema(self) -> None:
         """
@@ -405,7 +769,8 @@ class DuckDBClient:
             raise RuntimeError("DuckDB connection not initialized")
 
         # Projects table
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS projects (
                 id VARCHAR PRIMARY KEY,
                 name VARCHAR NOT NULL,
@@ -413,10 +778,12 @@ class DuckDBClient:
                 created_at TIMESTAMP DEFAULT current_timestamp,
                 updated_at TIMESTAMP DEFAULT current_timestamp
             )
-        """)
+        """
+        )
 
         # Repositories table
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS repositories (
                 id VARCHAR PRIMARY KEY,
                 project_id VARCHAR NOT NULL,
@@ -429,10 +796,12 @@ class DuckDBClient:
                 created_at TIMESTAMP DEFAULT current_timestamp,
                 FOREIGN KEY (project_id) REFERENCES projects(id)
             )
-        """)
+        """
+        )
 
         # Links table (relationships between repositories)
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS links (
                 id VARCHAR PRIMARY KEY,
                 project_id VARCHAR NOT NULL,
@@ -447,10 +816,12 @@ class DuckDBClient:
                 FOREIGN KEY (source_repo_id) REFERENCES repositories(id),
                 FOREIGN KEY (target_repo_id) REFERENCES repositories(id)
             )
-        """)
+        """
+        )
 
         # System logs table for centralized logging
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS system_logs (
                 log_id VARCHAR PRIMARY KEY,
                 timestamp TIMESTAMP DEFAULT current_timestamp,
@@ -459,15 +830,28 @@ class DuckDBClient:
                 message VARCHAR NOT NULL,
                 context JSON
             )
-        """)
+        """
+        )
 
         # Create indexes for common queries
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_repos_project ON repositories(project_id)")
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_links_project ON links(project_id)")
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_repo_id)")
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_repo_id)")
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON system_logs(timestamp)")
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_level ON system_logs(level)")
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_repos_project ON repositories(project_id)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_links_project ON links(project_id)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_repo_id)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_repo_id)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON system_logs(timestamp)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_logs_level ON system_logs(level)"
+        )
 
         logger.info("Created tables and indexes")
 
@@ -477,6 +861,8 @@ class DuckDBClient:
 
         Uses asyncio.Lock to prevent concurrent writes which could cause
         DuckDB locking errors.
+
+        Triggers snapshot creation after successful write for in-memory mode.
 
         Args:
             query: SQL query to execute
@@ -490,7 +876,15 @@ class DuckDBClient:
 
         async with self._write_lock:
             try:
-                return self.conn.execute(query, params)
+                result = self.conn.execute(query, params)
+
+                # Mark that data has changed and trigger snapshot (in-memory mode)
+                if self._is_memory_mode:
+                    self._pending_snapshot = True
+                    # Trigger snapshot creation asynchronously
+                    asyncio.create_task(self._trigger_snapshot_on_write())
+
+                return result
             except duckdb.IOException as e:
                 logger.error(f"DuckDB write error: {e}")
                 raise
@@ -539,13 +933,97 @@ class DuckDBClient:
         """
         return self.execute_read(query, params).fetchone()
 
+    async def _trigger_snapshot_on_write(self) -> None:
+        """
+        Trigger snapshot creation after write operations.
+
+        Uses a small delay to batch multiple rapid writes into a single snapshot.
+        """
+        if not self._is_memory_mode or not self.snapshot_manager:
+            return
+
+        # Small delay to batch rapid writes (e.g., bulk inserts)
+        await asyncio.sleep(1.0)
+
+        # Only create snapshot if still pending (not already created by another write)
+        if self._pending_snapshot:
+            self._pending_snapshot = False
+            try:
+                logger.info(
+                    "[EVENT-DRIVEN] Data changed detected, triggering snapshot creation..."
+                )
+                snapshot_path = self.create_snapshot()
+                if snapshot_path:
+                    logger.info(
+                        f"[EVENT-DRIVEN] ✓ Snapshot saved: {os.path.basename(snapshot_path)}"
+                    )
+                else:
+                    logger.warning("[EVENT-DRIVEN] Snapshot creation returned None")
+            except Exception as e:
+                logger.error(f"[EVENT-DRIVEN] ✗ Failed to create snapshot: {e}")
+
+    def create_snapshot(self) -> Optional[str]:
+        """
+        Create a snapshot of the current database state.
+
+        Only applicable for in-memory mode with snapshots enabled.
+
+        Returns:
+            Path to created snapshot, or None if not in snapshot mode
+        """
+        if not self._is_memory_mode or not self.snapshot_manager:
+            logger.debug(
+                "Snapshots not enabled (persistent mode or snapshots disabled)"
+            )
+            return None
+
+        if not self.conn:
+            logger.warning("Cannot create snapshot: database not connected")
+            return None
+
+        try:
+            snapshot_path = self.snapshot_manager.create_snapshot(self.conn)
+            # Cleanup old snapshots
+            self.snapshot_manager.cleanup_old_snapshots()
+            return snapshot_path
+        except Exception as e:
+            logger.error(f"Failed to create snapshot: {e}")
+            return None
+
     def close(self) -> None:
-        """Close DuckDB connection."""
+        """Close DuckDB connection with snapshot creation for in-memory mode."""
         if self.conn:
-            self.conn.close()
-            self.conn = None
-            self._initialized = False
-            logger.info("DuckDB connection closed")
+            # Create final snapshot before closing (in-memory mode only)
+            if self._is_memory_mode and self.snapshot_manager:
+                try:
+                    logger.info("Creating final snapshot before shutdown...")
+                    snapshot_path = self.create_snapshot()
+                    if snapshot_path:
+                        logger.info(
+                            f"Final snapshot created: {os.path.basename(snapshot_path)}"
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to create final snapshot: {e}")
+
+            # For persistent mode: Execute CHECKPOINT to flush WAL
+            if not self._is_memory_mode:
+                try:
+                    logger.info("Executing DuckDB CHECKPOINT before closing...")
+                    self.conn.execute("CHECKPOINT")
+                    logger.info("DuckDB CHECKPOINT completed successfully")
+                except Exception as e:
+                    logger.warning(f"Failed to execute CHECKPOINT during close: {e}")
+
+            try:
+                self.conn.close()
+                self.conn = None
+                self._initialized = False
+                logger.info("DuckDB connection closed")
+            except Exception as e:
+                logger.error(f"Error closing DuckDB connection: {e}")
+                # Ensure state is reset even if close fails
+                self.conn = None
+                self._initialized = False
 
     @property
     def is_initialized(self) -> bool:
@@ -561,16 +1039,24 @@ def get_duckdb_client() -> DuckDBClient:
     """Get global DuckDB client instance."""
     global _duckdb_client
     if _duckdb_client is None:
-        raise RuntimeError("DuckDB client not initialized. Call initialize_duckdb() first.")
+        raise RuntimeError(
+            "DuckDB client not initialized. Call initialize_duckdb() first."
+        )
     return _duckdb_client
 
 
-def initialize_duckdb(db_path: str = "data/metadata.duckdb") -> DuckDBClient:
+def initialize_duckdb(
+    db_path: str = "data/metadata.duckdb",
+    enable_snapshots: bool = True,
+    snapshot_keep_count: int = 5,
+    snapshots_dir: str = "data/snapshots",
+) -> DuckDBClient:
     """
     Initialize global DuckDB client.
 
     Args:
         db_path: Path to DuckDB database file, or ":memory:" for in-memory.
+        enable_snapshots: Enable automatic snapshots for in-memory mode.
 
     Returns:
         Initialized DuckDBClient instance
@@ -580,7 +1066,12 @@ def initialize_duckdb(db_path: str = "data/metadata.duckdb") -> DuckDBClient:
         logger.warning("DuckDB client already initialized")
         return _duckdb_client
 
-    _duckdb_client = DuckDBClient(db_path)
+    _duckdb_client = DuckDBClient(
+        db_path,
+        enable_snapshots=enable_snapshots,
+        snapshot_keep_count=snapshot_keep_count,
+        snapshots_dir=snapshots_dir,
+    )
     _duckdb_client.initialize()
     return _duckdb_client
 

@@ -11,6 +11,16 @@ This directory contains all documentation for the Financial Lineage Tool project
 
 ## Documentation by Category
 
+### Core Components
+
+| Document | Description |
+|----------|-------------|
+| [Ingestion Overview](ingestion/INGESTION_OVERVIEW.md) | Run-scoped ingestion pipeline and artifacts |
+| [Vector Ingestion Architecture](ingestion/VECTOR_INGESTION_ARCHITECTURE.md) | Chunking and vector indexing details |
+| [Knowledge Graph Architecture](knowledge-graph/KNOWLEDGE_GRAPH_ARCHITECTURE.md) | Neo4j schema and enrichment flow |
+| [Lineage Overview](knowledge-graph/LINEAGE_OVERVIEW.md) | Current lineage behavior and edge metadata |
+| [Chat Overview](chat/CHAT_OVERVIEW.md) | Chat endpoints and routing logic |
+
 ### Setup & Installation
 
 | Document | Description |
@@ -25,9 +35,9 @@ This directory contains all documentation for the Financial Lineage Tool project
 
 | Document | Description |
 |----------|-------------|
-| [SQL Organizer Quickstart](guides/SQL_ORGANIZER_QUICKSTART.md) | Quick start for SQL file organization |
-| [Hierarchical Organization Guide](guides/HIERARCHICAL_ORGANIZATION_GUIDE.md) | Comprehensive SQL organization guide |
-| [File Watcher Guide](guides/FILE_WATCHER_GUIDE.md) | Automatic SQL file processing |
+| [SQL Organizer Quickstart](ingestion/legacy/SQL_ORGANIZER_QUICKSTART.md) | Legacy SQL organizer quick start |
+| [Hierarchical Organization Guide](ingestion/legacy/HIERARCHICAL_ORGANIZATION_GUIDE.md) | Legacy SQL organizer deep dive |
+| [File Watcher Guide](ingestion/legacy/FILE_WATCHER_GUIDE.md) | Legacy file watcher workflow |
 | [Export Guide](guides/EXPORT_GUIDE.md) | Exporting data from knowledge graph and embeddings |
 | [AdventureWorks Guide](guides/ADVENTUREWORKS_GUIDE.md) | Working with AdventureWorks sample database |
 
@@ -64,11 +74,18 @@ This directory contains all documentation for the Financial Lineage Tool project
 3. [Architecture Overview](architecture/ARCHITECTURE.md) - Understand the system
 4. [API Reference](api/API_REFERENCE.md) - Explore the API
 
+### I want to ingest files (current pipeline)
+
+1. [Ingestion Overview](ingestion/INGESTION_OVERVIEW.md) - Run-scoped ingestion flow
+2. [API Reference](api/API_REFERENCE.md) - Ingest endpoints and request shapes
+3. [Vector Ingestion Architecture](ingestion/VECTOR_INGESTION_ARCHITECTURE.md) - Chunking + embeddings
+4. [Knowledge Graph Architecture](knowledge-graph/KNOWLEDGE_GRAPH_ARCHITECTURE.md) - Graph ingestion + snapshots
+
 ### I want to organize SQL files
 
-1. [SQL Organizer Quickstart](guides/SQL_ORGANIZER_QUICKSTART.md) - Basic usage
-2. [Hierarchical Organization Guide](guides/HIERARCHICAL_ORGANIZATION_GUIDE.md) - Advanced organization
-3. [File Watcher Guide](guides/FILE_WATCHER_GUIDE.md) - Automatic processing
+1. [SQL Organizer Quickstart](ingestion/legacy/SQL_ORGANIZER_QUICKSTART.md) - Legacy organizer usage
+2. [Hierarchical Organization Guide](ingestion/legacy/HIERARCHICAL_ORGANIZATION_GUIDE.md) - Legacy advanced organization
+3. [File Watcher Guide](ingestion/legacy/FILE_WATCHER_GUIDE.md) - Legacy automatic processing
 
 ### I want to set up the environment
 
@@ -81,8 +98,11 @@ This directory contains all documentation for the Financial Lineage Tool project
 
 1. [Architecture](architecture/ARCHITECTURE.md) - System overview
 2. [LlamaIndex RAG](architecture/LLAMAINDEX_RAG.md) - RAG pipeline details
-3. [Implementation Status](architecture/IMPLEMENTATION_STATUS.md) - Current status
-4. [AdventureWorks Guide](guides/ADVENTUREWORKS_GUIDE.md) - Sample data
+3. [Knowledge Graph Architecture](knowledge-graph/KNOWLEDGE_GRAPH_ARCHITECTURE.md) - Neo4j schema and edges
+4. [Vector Ingestion Architecture](ingestion/VECTOR_INGESTION_ARCHITECTURE.md) - Chunking + embeddings
+5. [Chat Overview](chat/CHAT_OVERVIEW.md) - Chat routing and endpoints
+6. [Implementation Status](architecture/IMPLEMENTATION_STATUS.md) - Current status
+7. [AdventureWorks Guide](guides/ADVENTUREWORKS_GUIDE.md) - Sample data
 
 ### I want to export data
 
@@ -97,6 +117,8 @@ This directory contains all documentation for the Financial Lineage Tool project
 ## Quick Reference
 
 ### SQL Organization Commands
+
+Note: These commands use the legacy organizer pipeline (`data/raw` -> `data/separated_sql`).
 
 ```bash
 # Hierarchical organization (recommended)
@@ -147,32 +169,50 @@ python scripts/test_qdrant.py
 
 ```
 docs/
-├── README.md                            # This file - Documentation hub
-├── setup/                               # Installation and setup
-│   ├── DOCKER_SETUP.md                 # Docker deployment (recommended)
-│   ├── GETTING_STARTED.md              # Quick start guide
-│   ├── DOCKER_SERVICES.md              # Docker service details
-│   ├── DOCKER_TROUBLESHOOTING.md       # Docker troubleshooting
-│   └── LOCAL_SETUP_GUIDE.md            # Manual setup (deprecated)
-├── architecture/                        # System architecture
-│   ├── ARCHITECTURE.md                 # System overview
-│   ├── LLAMAINDEX_RAG.md               # RAG pipeline details
-│   └── IMPLEMENTATION_STATUS.md        # Implementation status
-├── api/                                 # API documentation
-│   └── API_REFERENCE.md                # Complete API reference
-├── guides/                              # User and developer guides
-│   ├── SQL_ORGANIZER_QUICKSTART.md     # SQL organization quick start
-│   ├── HIERARCHICAL_ORGANIZATION_GUIDE.md  # Advanced SQL organization
-│   ├── FILE_WATCHER_GUIDE.md           # File watcher usage
-│   ├── EXPORT_GUIDE.md                 # Data export guide
-│   └── ADVENTUREWORKS_GUIDE.md         # Sample database guide
-├── database/                            # Database configuration
-│   ├── QDRANT_SETUP.md                 # Qdrant vector database
-│   └── GREMLIN_SETUP.md                # Cosmos DB Gremlin (legacy)
-└── troubleshooting/                     # Troubleshooting and notes
-    ├── TROUBLESHOOTING.md              # General troubleshooting
-    ├── IMPLEMENTATION_SUMMARY.md       # Implementation notes
-    └── NEXT_STEPS.md                   # Future improvements
+  README.md
+  api/
+    API_REFERENCE.md
+    AUTHENTICATION.md
+  architecture/
+    ARCHITECTURE.md
+    LLAMAINDEX_RAG.md
+    IMPLEMENTATION_STATUS.md
+  chat/
+    CHAT_OVERVIEW.md
+  ingestion/
+    INGESTION_OVERVIEW.md
+    VECTOR_INGESTION_ARCHITECTURE.md
+    PARALLEL_PROCESSING_GUIDE.md
+    legacy/
+      SQL_ORGANIZER_QUICKSTART.md
+      HIERARCHICAL_ORGANIZATION_GUIDE.md
+      FILE_WATCHER_GUIDE.md
+  knowledge-graph/
+    KNOWLEDGE_GRAPH_ARCHITECTURE.md
+    LINEAGE_OVERVIEW.md
+  guides/
+    EXPORT_GUIDE.md
+    ADVENTUREWORKS_GUIDE.md
+    PLUGIN_DEVELOPMENT_GUIDE.md
+    USER_CONTEXT_GUIDE.md
+  setup/
+    DOCKER_SETUP.md
+    GETTING_STARTED.md
+    DOCKER_SERVICES.md
+    DOCKER_TROUBLESHOOTING.md
+    LOCAL_SETUP_GUIDE.md
+  operations/
+    DEPLOYMENT_GUIDE.md
+    MONITORING_GUIDE.md
+    QDRANT_TUNING.md
+    ROLLBACK_PROCEDURES.md
+  database/
+    QDRANT_SETUP.md
+    GREMLIN_SETUP.md
+  troubleshooting/
+    TROUBLESHOOTING.md
+    IMPLEMENTATION_SUMMARY.md
+    NEXT_STEPS.md
 ```
 
 ## Contributing
@@ -252,5 +292,10 @@ Links to related docs
 
 ---
 
-**Last Updated**: 2025-12-31
-**Documentation Version**: 2.0.0 - Reorganized structure
+**Last Updated**: 2026-01-13
+**Documentation Version**: 2.1.0 - Reorganized core component docs
+
+
+
+
+

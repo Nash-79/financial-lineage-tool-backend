@@ -1,0 +1,5 @@
+-- Source: demo_data/postgres_investments_embeddings2.sql
+-- Type: SQL_STATEMENT
+-- Chunk: 16
+----------------------------------------
+/* View to unify all raw trades using normalize_trade */ CREATE OR REPLACE VIEW stg_investments.v_all_trades AS SELECT tf.trade_ts, tf.account_code, tf.isin AS instrument_isin, (nt.norm_qty) AS quantity, (nt.norm_price) AS price_ccy, tf.currency, tf.source_system FROM raw_market.trade_feed_venue_a AS tf CROSS JOIN LATERAL stg_investments.normalize_trade(tf.side, tf.quantity, tf.price, NULL) AS nt UNION ALL SELECT tf.exec_time AS trade_ts, tf.portfolio AS account_code, NULL AS instrument_isin /* will be resolved via ticker in later step */, (nt.norm_qty) AS quantity, (nt.norm_price) AS price_ccy, tf.ccy AS currency, tf.source_system FROM raw_market.trade_feed_venue_b AS tf CROSS JOIN LATERAL stg_investments.normalize_trade(tf.direction, tf.qty, NULL, tf.gross_amount) AS nt

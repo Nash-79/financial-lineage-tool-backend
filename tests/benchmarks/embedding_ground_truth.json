@@ -1,0 +1,242 @@
+{
+    "metadata": {
+        "version": "1.0",
+        "created": "2026-01-11",
+        "description": "Ground truth dataset for embedding model benchmarking on SQL lineage queries",
+        "total_queries": 22,
+        "categories": [
+            "join_analysis",
+            "schema_lookup",
+            "data_flow",
+            "transformation_logic"
+        ]
+    },
+    "queries": [
+        {
+            "id": "join_001",
+            "query": "Which tables does customer_orders JOIN with?",
+            "relevant_chunks": [
+                "sql/analytics/customer_pipeline.sql",
+                "sql/base/orders.sql"
+            ],
+            "category": "join_analysis",
+            "difficulty": "easy"
+        },
+        {
+            "id": "join_002",
+            "query": "What are all the tables involved in the sales_fact lineage?",
+            "relevant_chunks": [
+                "sql/etl/sales_aggregation.sql",
+                "sql/staging/sales_staging.sql",
+                "sql/base/transactions.sql"
+            ],
+            "category": "join_analysis",
+            "difficulty": "medium"
+        },
+        {
+            "id": "join_003",
+            "query": "Find queries that join users with payments",
+            "relevant_chunks": [
+                "sql/analytics/user_revenue.sql",
+                "sql/reports/payment_summary.sql"
+            ],
+            "category": "join_analysis",
+            "difficulty": "medium"
+        },
+        {
+            "id": "join_004",
+            "query": "Which tables have foreign key relationships to customers table?",
+            "relevant_chunks": [
+                "sql/schema/create_customers.sql",
+                "sql/schema/create_orders.sql",
+                "sql/schema/create_addresses.sql"
+            ],
+            "category": "join_analysis",
+            "difficulty": "hard"
+        },
+        {
+            "id": "join_005",
+            "query": "Show me queries that perform multi-way joins with product catalog",
+            "relevant_chunks": [
+                "sql/analytics/product_analysis.sql",
+                "sql/reports/catalog_report.sql"
+            ],
+            "category": "join_analysis",
+            "difficulty": "hard"
+        },
+        {
+            "id": "schema_001",
+            "query": "What columns are in the users table?",
+            "relevant_chunks": [
+                "sql/schema/create_users.sql"
+            ],
+            "category": "schema_lookup",
+            "difficulty": "easy"
+        },
+        {
+            "id": "schema_002",
+            "query": "List all columns with email in the name",
+            "relevant_chunks": [
+                "sql/schema/create_users.sql",
+                "sql/schema/create_customers.sql",
+                "sql/schema/create_contacts.sql"
+            ],
+            "category": "schema_lookup",
+            "difficulty": "easy"
+        },
+        {
+            "id": "schema_003",
+            "query": "What is the schema definition for orders table?",
+            "relevant_chunks": [
+                "sql/schema/create_orders.sql"
+            ],
+            "category": "schema_lookup",
+            "difficulty": "easy"
+        },
+        {
+            "id": "schema_004",
+            "query": "Find tables that have created_at and updated_at timestamp columns",
+            "relevant_chunks": [
+                "sql/schema/create_users.sql",
+                "sql/schema/create_orders.sql",
+                "sql/schema/create_products.sql"
+            ],
+            "category": "schema_lookup",
+            "difficulty": "medium"
+        },
+        {
+            "id": "schema_005",
+            "query": "Which tables have JSON or JSONB columns?",
+            "relevant_chunks": [
+                "sql/schema/create_events.sql",
+                "sql/schema/create_metadata.sql"
+            ],
+            "category": "schema_lookup",
+            "difficulty": "medium"
+        },
+        {
+            "id": "dataflow_001",
+            "query": "What tables are upstream of the customer_metrics table?",
+            "relevant_chunks": [
+                "sql/etl/customer_metrics_build.sql",
+                "sql/staging/customer_staging.sql"
+            ],
+            "category": "data_flow",
+            "difficulty": "medium"
+        },
+        {
+            "id": "dataflow_002",
+            "query": "Trace the lineage from raw events to the analytics dashboard",
+            "relevant_chunks": [
+                "sql/etl/events_processor.sql",
+                "sql/analytics/dashboard_metrics.sql",
+                "sql/staging/events_staging.sql"
+            ],
+            "category": "data_flow",
+            "difficulty": "hard"
+        },
+        {
+            "id": "dataflow_003",
+            "query": "Which downstream tables depend on the transactions table?",
+            "relevant_chunks": [
+                "sql/etl/transaction_summary.sql",
+                "sql/analytics/revenue_report.sql",
+                "sql/staging/transaction_staging.sql"
+            ],
+            "category": "data_flow",
+            "difficulty": "medium"
+        },
+        {
+            "id": "dataflow_004",
+            "query": "Find all ETL jobs that read from the staging schema",
+            "relevant_chunks": [
+                "sql/etl/staging_to_warehouse.sql",
+                "sql/etl/data_quality_checks.sql"
+            ],
+            "category": "data_flow",
+            "difficulty": "medium"
+        },
+        {
+            "id": "dataflow_005",
+            "query": "What is the complete data pipeline for user_activity_summary?",
+            "relevant_chunks": [
+                "sql/base/user_events.sql",
+                "sql/staging/user_staging.sql",
+                "sql/analytics/user_activity_summary.sql"
+            ],
+            "category": "data_flow",
+            "difficulty": "hard"
+        },
+        {
+            "id": "transform_001",
+            "query": "Show me queries with window functions for ranking",
+            "relevant_chunks": [
+                "sql/analytics/top_customers.sql",
+                "sql/reports/product_rankings.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "medium"
+        },
+        {
+            "id": "transform_002",
+            "query": "Find CTEs that compute running totals or cumulative sums",
+            "relevant_chunks": [
+                "sql/analytics/running_revenue.sql",
+                "sql/reports/cumulative_metrics.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "hard"
+        },
+        {
+            "id": "transform_003",
+            "query": "Which queries use PIVOT or aggregate transformations?",
+            "relevant_chunks": [
+                "sql/analytics/pivot_report.sql",
+                "sql/etl/aggregation_job.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "medium"
+        },
+        {
+            "id": "transform_004",
+            "query": "Show me subqueries that filter data before aggregation",
+            "relevant_chunks": [
+                "sql/analytics/filtered_aggregates.sql",
+                "sql/reports/conditional_summary.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "medium"
+        },
+        {
+            "id": "transform_005",
+            "query": "Find queries with CASE statements for data categorization",
+            "relevant_chunks": [
+                "sql/analytics/customer_segments.sql",
+                "sql/etl/data_classification.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "easy"
+        },
+        {
+            "id": "transform_006",
+            "query": "Which queries perform date manipulations or time-based calculations?",
+            "relevant_chunks": [
+                "sql/analytics/monthly_trends.sql",
+                "sql/etl/date_dimension.sql",
+                "sql/reports/time_series_analysis.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "medium"
+        },
+        {
+            "id": "transform_007",
+            "query": "Show me queries with complex string parsing or regex operations",
+            "relevant_chunks": [
+                "sql/etl/log_parsing.sql",
+                "sql/staging/data_cleaning.sql"
+            ],
+            "category": "transformation_logic",
+            "difficulty": "hard"
+        }
+    ]
+}

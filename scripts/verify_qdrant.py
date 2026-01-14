@@ -8,7 +8,7 @@ import os
 from dotenv import load_dotenv
 
 # Ensure src is in pythonpath
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.utils.diagnostics import verify_qdrant_connection
 

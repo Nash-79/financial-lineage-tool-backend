@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "expected_nodes": 5,
+  "expected_edges": 0,
+  "missing_nodes": [],
+  "missing_edges": [],
+  "missing_nodes_count": 0,
+  "missing_edges_count": 0,
+  "error": null,
+  "file_path": "demo_data/postgres_investments_embeddings2.sql",
+  "project_id": "8ae9366d-a5da-44a3-a0d0-c0d2355b9b97",
+  "ingestion_id": "2bcdfa3f-32bd-4445-a516-b4f15f362211"
+}

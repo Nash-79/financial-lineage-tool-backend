@@ -2,6 +2,11 @@
 
 Complete reference for all Financial Lineage Tool API endpoints.
 
+## Authentication & Rate Limits
+- JWT Bearer tokens are required for protected routes (admin, ingestion, files, GitHub, database, ingestion logs). In production or when `JWT_REQUIRED=true`, missing/invalid tokens return 401.
+- Optional API keys can be supplied via `X-API-Key`.
+- Rate limits (SlowAPI): default `RATE_LIMIT_DEFAULT` (100/minute), chat `RATE_LIMIT_CHAT` (30/minute), ingestion `RATE_LIMIT_INGEST` (10/minute), auth `RATE_LIMIT_AUTH` (5/minute). Responses include `X-RateLimit-*` headers.
+
 ## Base URL
 
 ```
@@ -100,15 +105,16 @@ POST /api/v1/projects
 
 **Response**: `Project`
 ```json
-{
-  "id": "proj-456",
-  "name": "Sales Pipeline",
-  "description": "Sales data processing",
-  "repositories": [],
-  "links": [],
-  "created_at": "2025-12-31T20:00:00",
-  "updated_at": "2025-12-31T20:00:00"
-}
+  {
+    "id": "proj-456",
+    "name": "Sales Pipeline",
+    "description": "Sales data processing",
+    "repositories": [],
+    "links": [],
+    "project_links": [],
+    "created_at": "2025-12-31T20:00:00",
+    "updated_at": "2025-12-31T20:00:00"
+  }
 ```
 
 ### Get Project Details
@@ -134,9 +140,68 @@ GET /api/v1/projects/{project_id}
     }
   ],
   "links": [],
+  "project_links": [],
   "created_at": "2025-12-31T20:00:00",
   "updated_at": "2025-12-31T20:00:00"
 }
+```
+
+### Create Project Link
+
+Create a manual link between two projects.
+
+```http
+POST /api/v1/projects/{project_id}/project-links
+```
+
+**Request**: `ProjectLinkCreate`
+```json
+{
+  "target_project_id": "proj-456",
+  "description": "Upstream dependency on Sales project"
+}
+```
+
+**Response**: `ProjectLinkResponse`
+```json
+{
+  "id": "plink-123",
+  "source_project_id": "proj-123",
+  "target_project_id": "proj-456",
+  "link_type": "manual",
+  "description": "Upstream dependency on Sales project",
+  "created_at": "2025-12-31T20:00:00"
+}
+```
+
+### List Project Links
+
+List all links involving a project.
+
+```http
+GET /api/v1/projects/{project_id}/project-links
+```
+
+**Response**:
+```json
+[
+  {
+    "id": "plink-123",
+    "source_project_id": "proj-123",
+    "target_project_id": "proj-456",
+    "link_type": "manual",
+    "description": "Upstream dependency on Sales project",
+    "created_at": "2025-12-31T20:00:00"
+  }
+]
+```
+
+### Delete Project Link
+
+Delete a project-to-project link.
+
+```http
+DELETE /api/v1/projects/{project_id}/project-links/{link_id}
 ```
 
 ### Update Project
@@ -185,6 +250,9 @@ POST /api/v1/files/upload
 - `project_id` (string, required): Project ID to associate files with
 - `repository_id` (string, optional): Repository ID (creates new if omitted)
 - `repository_name` (string, optional): Repository name (required if repository_id omitted)
+- `instructions` (string, optional): Additional guidance for lineage extraction
+- `dialect` (string, optional): SQL dialect for parsing (default: auto)
+- `verbose` (bool, optional): Enable verbose ingestion logging
 
 **Response**: `UploadResponse`
 ```json
@@ -192,13 +260,35 @@ POST /api/v1/files/upload
   "success": true,
   "files_processed": 3,
   "files_failed": 0,
+  "ingestion_id": "ingest-123",
+    "snapshot": {
+      "path": "data/customer_analytics/20260113_120000_001_upload_customer_analytics/KG/neo4j_snapshot_20260113_120000_ingest-123.json",
+      "node_count": 120,
+      "edge_count": 220,
+      "timestamp": "20260113_120000",
+      "project_name": "Customer Analytics",
+      "project_id": "proj-123",
+      "run_id": "run-789",
+      "ingestion_id": "ingest-123"
+    },
   "results": [
     {
       "filename": "customer_schema.sql",
       "status": "success",
       "file_id": "file-123",
       "nodes_created": 15,
-      "message": "Processed successfully"
+      "message": "Processed successfully",
+      "validation": {
+        "status": "passed",
+        "missing_nodes_count": 0,
+        "missing_edges_count": 0
+      },
+      "kg_enrichment": {
+        "model": "mistralai/devstral-2512:free",
+        "proposed_edges": 2,
+        "accepted_edges": 1,
+        "confidence_avg": 0.87
+      }
     }
   ],
   "repository_id": "repo-456",
@@ -298,6 +388,38 @@ GET /api/v1/config/websocket
 {
   "websocket_url": "ws://127.0.0.1:8000/api/v1/ws/dashboard"
 }
+```
+
+---
+
+## Configuration Endpoints
+
+### Get SQL Dialects
+
+Retrieve enabled SQL dialects for ingestion and parsing.
+
+```http
+GET /api/v1/config/sql-dialects
+```
+
+**Response**:
+```json
+[
+  {
+    "id": "tsql",
+    "display_name": "T-SQL (SQL Server)",
+    "sqlglot_key": "tsql",
+    "is_default": true,
+    "enabled": true
+  },
+  {
+    "id": "duckdb",
+    "display_name": "DuckDB",
+    "sqlglot_key": "duckdb",
+    "is_default": false,
+    "enabled": true
+  }
+]
 ```
 
 ---
@@ -547,6 +669,10 @@ POST /api/chat/semantic
   "latency_ms": 234.5
 }
 ```
+
+**Hybrid Search Example**:
+- Enable `ENABLE_HYBRID_SEARCH=true` to blend keyword (BM25) and semantic results.
+- Example query: `"gross margin by product"` will match exact SQL text and related embeddings.
 
 ### Graph-Based Chat
 
@@ -878,22 +1004,28 @@ POST /api/v1/ingest
 ```json
 {
   "file_path": "/path/to/schema.sql",
-  "file_type": "sql"
+  "file_type": "sql",
+  "dialect": "auto"
 }
 ```
 
-**Response**:
-```json
-{
-  "status": "accepted",
-  "file": "/path/to/schema.sql"
-}
-```
+  **Response**:
+  ```json
+  {
+    "status": "accepted",
+    "file": "/path/to/schema.sql",
+    "project_id": "proj-123",
+    "run_id": "run-456",
+    "ingestion_id": "ingest-789",
+    "run_dir": "data/customer_analytics/20260113_120000_001_ingest_schema"
+  }
+  ```
 
 **Notes**:
 - Processing happens in the background
 - File is chunked, embedded, and stored in Qdrant
 - Entities are extracted and stored in Neo4j
+- Re-ingesting the same `file_path` purges prior chunks and graph nodes before insert (idempotent)
 
 ### Ingest Raw SQL
 
@@ -907,7 +1039,7 @@ POST /api/v1/ingest/sql
 ```json
 {
   "sql_content": "CREATE TABLE customers (\n  id INT PRIMARY KEY,\n  name VARCHAR(100)\n);",
-  "dialect": "tsql",
+  "dialect": "auto",
   "source_file": "manual_input.sql"
 }
 ```
@@ -919,6 +1051,99 @@ POST /api/v1/ingest/sql
   "source": "manual_input.sql"
 }
 ```
+
+**Notes**:
+- Re-ingesting the same `source_file` purges prior chunks and graph nodes before insert
+
+### List Ingestion Sessions
+
+List all ingestion log sessions with optional filters, ordered by most recent.
+
+```http
+GET /api/v1/ingestion/logs?project_id=&source=&status=&limit=50
+```
+
+**Query Parameters**:
+- `project_id` (string, optional): Filter by project ID
+- `source` (string, optional): Filter by source (`upload` or `github`)
+- `status` (string, optional): Filter by status (`pending`, `in_progress`, `completed`, `completed_with_errors`, `failed`)
+- `limit` (int, optional): Maximum results (1-200, default: 50)
+
+**Response**: `IngestionLogsResponse`
+```json
+{
+  "sessions": [
+    {
+      "ingestion_id": "ingest-456",
+      "source": "github",
+      "project_id": "proj-789",
+      "project_status": "active",
+      "repository_id": "repo-012",
+      "run_id": "run-345",
+      "status": "completed",
+      "started_at": "2026-01-09T13:00:00",
+      "completed_at": "2026-01-09T13:05:30",
+      "filenames": ["schema.sql", "views.sql"],
+      "source_repo": "owner/repository"
+    },
+    {
+      "ingestion_id": "ingest-123",
+      "source": "upload",
+      "project_id": "proj-456",
+      "project_status": "active",
+      "repository_id": "repo-789",
+      "run_id": "run-012",
+      "status": "completed_with_errors",
+      "started_at": "2026-01-09T12:00:00",
+      "completed_at": "2026-01-09T12:03:15",
+      "filenames": ["data.sql"],
+      "source_repo": null
+    }
+  ],
+  "total": 2,
+  "limit": 50
+}
+```
+
+**Notes**:
+- Results are ordered by `started_at` descending (most recent first)
+- Index files are created per ingestion run in `data/*/ingestion_index.json`
+- Filters can be combined (e.g., `?source=github&status=completed`)
+
+### Get Ingestion Session Logs
+
+Retrieve detailed persisted logs for a specific ingestion session.
+
+```http
+GET /api/v1/ingestion/logs/{ingestion_id}?format=json|jsonl&download=false
+```
+
+**Query Parameters**:
+- `format` (string, optional): `json` (pretty-printed) or `jsonl` (default: `json`)
+- `download` (bool, optional): Return as attachment if true (default: false)
+
+**Response** (`format=json`):
+```json
+{
+  "ingestion_id": "ingest-123",
+  "events": [
+    {
+      "timestamp": "2026-01-08T22:08:12.000Z",
+      "type": "ingestion_started",
+      "level": "info",
+      "payload": {
+        "total_files": 3
+      }
+    }
+  ]
+}
+```
+
+**Notes**:
+- `stage_event` entries include post-ingestion stages:
+  - `graph_snapshot` (snapshot_path, node_count, edge_count)
+  - `validation` (status, missing_nodes, missing_edges)
+  - `kg_enrichment` (model, proposed_edges, accepted_edges, confidence_* stats)
 
 ---
 
