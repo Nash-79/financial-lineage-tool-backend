@@ -339,7 +339,7 @@ PUT /api/v1/files/config
 WebSocket endpoint for real-time dashboard updates.
 
 ```http
-WS /api/v1/ws/dashboard
+WS /admin/ws/dashboard
 ```
 
 **Connection**: Upgrade to WebSocket protocol
@@ -386,7 +386,7 @@ GET /api/v1/config/websocket
 **Response**:
 ```json
 {
-  "websocket_url": "ws://127.0.0.1:8000/api/v1/ws/dashboard"
+  "websocket_url": "ws://127.0.0.1:8000/admin/ws/dashboard"
 }
 ```
 

@@ -4,23 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 import re
-import os
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
+from loguru import logger
 
 from src.api.config import config
 from src.llm.free_tier import DEFAULT_FREE_TIER_MODEL, enforce_free_tier
 from src.storage.duckdb_client import get_duckdb_client
 from src.utils import metrics
 from src.utils.urn import generate_urn, is_valid_urn
-
-logger = logging.getLogger(__name__)
 
 BASE_SYSTEM_PROMPT = (
     "You are the Financial Lineage Tool assistant. Your job is to answer questions "
@@ -133,7 +130,6 @@ class ChatService:
         self.graph = graph
         self.api_key = openrouter_api_key
         self.client = httpx.AsyncClient(timeout=120.0)
-        self._ensure_chat_logger()
 
     async def close(self) -> None:
         """Close the underlying HTTP client."""
@@ -771,11 +767,12 @@ class ChatService:
 
             parsed = self._parse_llm_json(response_text)
             if parsed is None:
-                logger.error(
-                    "Malformed LLM response for %s (%s): %s",
+                # Log to application logs (not chat logs) with structured data
+                logger.debug(
+                    "Malformed LLM response for endpoint=%s model=%s",
                     endpoint,
                     selected_model,
-                    response_text,
+                    extra={"raw_response": response_text[:500]},  # Truncate for safety
                 )
                 attempts.append(
                     ModelAttempt(
@@ -861,6 +858,11 @@ class ChatService:
 
     def _parse_llm_json(self, response_text: str) -> Optional[Dict[str, Any]]:
         cleaned = response_text.strip()
+
+        # Strip DeepSeek R1 thinking tokens (e.g., <think>...</think>)
+        cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL).strip()
+
+        # Strip markdown code blocks
         if cleaned.startswith("```"):
             cleaned = re.sub(r"^```[a-zA-Z]*", "", cleaned).strip()
             if cleaned.endswith("```"):
@@ -1080,19 +1082,6 @@ class ChatService:
             return action
         return f"{action}?"
 
-    def _ensure_chat_logger(self) -> None:
-        if getattr(self, "_chat_logger_ready", False):
-            return
-        log_dir = os.path.join(config.LOG_PATH, "chat")
-        os.makedirs(log_dir, exist_ok=True)
-        log_path = os.path.join(log_dir, f"chat_{datetime.utcnow().date().isoformat()}.log")
-        handler = logging.FileHandler(log_path, encoding="utf-8")
-        formatter = logging.Formatter("%(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
-        self._chat_logger_ready = True
-
     def _log_chat_event(
         self,
         *,
@@ -1105,8 +1094,10 @@ class ChatService:
         next_actions: List[str],
         latency_seconds: float,
     ) -> None:
+        """Log chat event to dedicated JSONL log file."""
+        from src.utils.loguru_config import log_to_category
+
         payload = {
-            "timestamp": datetime.utcnow().isoformat(),
             "endpoint": endpoint,
             "project_id": project_id,
             "model": model,
@@ -1119,7 +1110,7 @@ class ChatService:
             "latency_ms": int(latency_seconds * 1000),
             "query": query,
         }
-        logger.info(json.dumps(payload, ensure_ascii=True))
+        log_to_category("chat", payload)
 
     def _has_graph_sources(self, sources: List[Dict[str, Any]]) -> bool:
         return any(source.get("type") == "graph" for source in sources)
