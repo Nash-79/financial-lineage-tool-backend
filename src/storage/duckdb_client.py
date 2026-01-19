@@ -32,6 +32,27 @@ except ImportError:
     TRANSACTIONS_AVAILABLE = False
     logger.warning("Transaction module not available")
 
+# Phase 3: Query caching
+try:
+    from src.storage.query_cache import QueryCache
+    QUERY_CACHE_AVAILABLE = True
+except ImportError:
+    QUERY_CACHE_AVAILABLE = False
+    logger.warning("Query cache module not available")
+
+# Phase 4: Error handling
+try:
+    from src.storage.database_exceptions import (
+        DatabaseException,
+        ConnectionException,
+        QueryException,
+        TransactionException,
+    )
+    DATABASE_EXCEPTIONS_AVAILABLE = True
+except ImportError:
+    DATABASE_EXCEPTIONS_AVAILABLE = False
+    logger.warning("Database exceptions module not available")
+
 logger = logging.getLogger(__name__)
 
 
