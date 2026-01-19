@@ -262,3 +262,76 @@ async def get_recent_events(limit: int = Query(default=100, le=1000)) -> Dict[st
         "events": state.activity_tracker.get_recent_events(limit=limit),
         "total_events": len(state.activity_tracker.events),
     }
+
+
+@router.get("/health/database")
+async def database_health() -> Dict[str, Any]:
+    """
+    Get database connection pool health status.
+    
+    Phase 1: Returns connection pool statistics when pooling is enabled,
+    or singleton connection status when pooling is disabled.
+    
+    Returns:
+        Dictionary containing database health information including:
+        - status: "healthy" or "unhealthy"
+        - connection_pool.enabled: Whether connection pooling is active
+        - connection_pool.stats: Pool statistics (if enabled)
+        - mode: "singleton" or "pool"
+    
+    Raises:
+        HTTPException: If unable to retrieve database status
+    """
+    try:
+        from ...storage.duckdb_client import get_duckdb_client
+        
+        db = get_duckdb_client()
+        
+        # Check if connection pool is enabled
+        if hasattr(db, '_enable_pool') and db._enable_pool and db._pool:
+            # Connection pool mode
+            pool_stats = db._pool.get_stats()
+            
+            return {
+                "status": "healthy" if not db._pool.is_closed else "unhealthy",
+                "mode": "pool",
+                "connection_pool": {
+                    "enabled": True,
+                    "active_connections": pool_stats["active_connections"],
+                    "pool_size": pool_stats["pool_size"],
+                    "max_connections": db._pool.max_connections,
+                    "min_connections": db._pool.min_connections,
+                    "statistics": {
+                        "total_created": pool_stats["connections_created"],
+                        "total_acquired": pool_stats["connections_acquired"],
+                        "total_returned": pool_stats["connections_returned"],
+                        "timeouts": pool_stats["connections_timed_out"],
+                        "health_checks_performed": pool_stats["health_checks_performed"],
+                        "health_check_failures": pool_stats["health_check_failures"],
+                    },
+                },
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        else:
+            # Singleton mode
+            is_healthy = db.conn is not None and db.is_initialized
+            
+            return {
+                "status": "healthy" if is_healthy else "unhealthy",
+                "mode": "singleton",
+                "connection_pool": {
+                    "enabled": False,
+                },
+                "database": {
+                    "path": db.db_path,
+                    "initialized": db.is_initialized,
+                    "is_memory_mode": db._is_memory_mode,
+                },
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve database health: {str(e)}"
+        )

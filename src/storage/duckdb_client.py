@@ -3,6 +3,8 @@ DuckDB client for metadata storage.
 
 Provides persistent or in-memory storage for projects, repositories, and links.
 Supports DuckDB SQL dialect features like QUALIFY, LIST aggregation, and JSON operators.
+
+Phase 1 Integration: Optional connection pooling for better concurrency.
 """
 
 import asyncio
@@ -14,7 +16,16 @@ from typing import Any, Dict, Optional
 import duckdb
 from src.storage.snapshot_manager import SnapshotManager
 
+# Phase 1: Connection pool integration
+try:
+    from src.storage.duckdb_connection_pool import DuckDBConnectionPool, PooledConnection
+    CONNECTION_POOL_AVAILABLE = True
+except ImportError:
+    CONNECTION_POOL_AVAILABLE = False
+    logger.warning("Connection pool module not available, using singleton mode only")
+
 logger = logging.getLogger(__name__)
+
 
 
 class DuckDBClient:
@@ -24,6 +35,7 @@ class DuckDBClient:
     Supports:
     - Persistent mode: data/metadata.duckdb (local hosting)
     - In-memory mode: :memory: (cloud/serverless hosting)
+    - Connection pooling: Optional for better concurrency (Phase 1)
 
     Thread safety is handled via asyncio.Lock for write operations.
     DuckDB supports concurrent reads natively (MVCC).
@@ -35,6 +47,9 @@ class DuckDBClient:
         enable_snapshots: bool = True,
         snapshot_keep_count: int = 5,
         snapshots_dir: str = "data/snapshots",
+        # Phase 1: Connection pool parameters
+        enable_connection_pool: bool = False,
+        pool_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize DuckDB client.
@@ -42,22 +57,44 @@ class DuckDBClient:
         Args:
             db_path: Path to DuckDB database file, or ":memory:" for in-memory.
             enable_snapshots: Enable automatic snapshots for in-memory mode (default: True)
+            snapshot_keep_count: Number of snapshots to retain
+            snapshots_dir: Directory for snapshot storage
+            enable_connection_pool: Enable connection pooling (Phase 1, default: False)
+            pool_config: Connection pool configuration (max_connections, min_connections, etc.)
         """
         self.db_path = db_path
-        self.conn: Optional[duckdb.DuckDBPyConnection] = None
-        self._write_lock = asyncio.Lock()
-        self._initialized = False
         self._is_memory_mode = db_path == ":memory:"
-
-        # Initialize snapshot manager for in-memory mode
+        self._initialized = False
+        
+        # Phase 1: Connection pool support
+        self._enable_pool = enable_connection_pool and CONNECTION_POOL_AVAILABLE
+        self._pool: Optional[DuckDBConnectionPool] = None
+        
+        if self._enable_pool:
+            # Initialize connection pool
+            pool_config = pool_config or {}
+            self._pool = DuckDBConnectionPool(
+                db_path=db_path,
+                **pool_config
+            )
+            logger.info(f"Connection pool enabled for {db_path}")
+            # No direct connection in pool mode
+            self.conn: Optional[duckdb.DuckDBPyConnection] = None
+        else:
+            # Traditional singleton connection
+            self.conn: Optional[duckdb.DuckDBPyConnection] = None
+            self._write_lock = asyncio.Lock()
+        
+        # Initialize snapshot manager for in-memory mode (singleton only)
         self.snapshot_manager: Optional[SnapshotManager] = None
         self._pending_snapshot = False  # Track if snapshot is needed
-        if self._is_memory_mode and enable_snapshots:
+        if self._is_memory_mode and enable_snapshots and not self._enable_pool:
             self.snapshot_manager = SnapshotManager(
                 snapshots_dir=snapshots_dir,
                 keep_count=snapshot_keep_count,
             )
             logger.info("Snapshot manager enabled for in-memory mode")
+
 
     async def save_chat_artifact(
         self,
@@ -148,10 +185,17 @@ class DuckDBClient:
 
         For persistent mode: Creates database file if it doesn't exist.
         For in-memory mode: Loads latest snapshot if available.
+        For connection pool mode: Marks as initialized (pool initializes on first use).
         Creates all required tables, indexes, and constraints.
         """
         if self._initialized:
             logger.warning("DuckDB already initialized")
+            return
+        
+        # Phase 1: Connection pool mode - defer initialization to first use
+        if self._enable_pool and self._pool:
+            logger.info("Connection pool mode enabled - pool will initialize on first use")
+            self._initialized = True
             return
 
         # Create parent directory for persistent databases
@@ -228,7 +272,7 @@ class DuckDBClient:
         # Check current version
         result = self.conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
         current_version = result[0] if result and result[0] else 0
-        target_version = 7
+        target_version = 8
 
         # Migration status banner
         logger.info("=" * 70)
@@ -299,6 +343,15 @@ class DuckDBClient:
                 "Migration 6 -> 7 completed successfully (chat artifacts table)"
             )
             current_version = 7
+
+        if current_version == 7:
+            # V8: Add model_configs table for unified model configuration
+            self._migrate_to_v8()
+            self.conn.execute("INSERT INTO schema_version (version) VALUES (8)")
+            logger.info(
+                "Migration 7 -> 8 completed successfully (model configs table)"
+            )
+            current_version = 8
 
         self._ensure_file_macros()
 
@@ -794,6 +847,71 @@ class DuckDBClient:
 
         logger.info("Created chat_artifacts table with indexes")
 
+    def _migrate_to_v8(self) -> None:
+        """
+        Migrate schema from v7 to v8: Add model_configs table.
+
+        WHAT: Create model_configs table for unified model configuration system
+        WHY: Enable centralized model assignment and fallback chains per usage type
+        WHEN: 2026-01-18 (dockerize-frontend and model configuration fixes)
+
+        SCHEMA CHANGES:
+        - CREATE TABLE model_configs
+          - id: VARCHAR PRIMARY KEY (UUID)
+          - usage_type: VARCHAR NOT NULL (e.g., "chat_deep", "embedding")
+          - priority: INTEGER NOT NULL (1=primary, 2=secondary, etc.)
+          - model_id: VARCHAR NOT NULL (model identifier)
+          - model_name: VARCHAR NOT NULL (human-readable name)
+          - provider: VARCHAR NOT NULL (e.g., "openrouter", "ollama")
+          - parameters: JSON (optional model-specific parameters)
+          - enabled: BOOLEAN DEFAULT TRUE
+          - created_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          - updated_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          - UNIQUE (usage_type, priority)
+        - CREATE INDEX idx_model_configs_usage_type
+        - CREATE INDEX idx_model_configs_enabled
+
+        DATA MIGRATION: None (new table, auto-seeded on first use)
+        ROLLBACK: DROP TABLE model_configs
+        RISK LEVEL: Low (additive change only)
+        AFFECTED FEATURES: Model configuration API, chat services
+        """
+        if not self.conn:
+            raise RuntimeError("DuckDB connection not initialized")
+
+        # Create model_configs table
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_configs (
+                id VARCHAR PRIMARY KEY,
+                usage_type VARCHAR NOT NULL,
+                priority INTEGER NOT NULL,
+                model_id VARCHAR NOT NULL,
+                model_name VARCHAR NOT NULL,
+                provider VARCHAR NOT NULL,
+                parameters JSON,
+                enabled BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (usage_type, priority)
+            )
+        """
+        )
+
+        # Create indexes for performance
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_model_configs_usage_type ON model_configs(usage_type)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_model_configs_enabled ON model_configs(enabled)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_model_configs_usage_priority ON model_configs(usage_type, priority)"
+        )
+
+        logger.info("Created model_configs table with indexes")
+
+
     def _ensure_file_macros(self) -> None:
         """Ensure file deduplication macros use repository-aware signatures."""
         if not self.conn:
@@ -1264,6 +1382,27 @@ class DuckDBClient:
                 retention_days,
             )
         return deleted_count
+    
+    async def initialize_pool(self) -> None:
+        """
+        Initialize connection pool asynchronously.
+        
+        Phase 1: This method should be called in async context to properly
+        initialize the connection pool and start health check tasks.
+        
+        Only applicable when connection pool is enabled.
+        """
+        if not self._enable_pool or not self._pool:
+            logger.warning("Connection pool not enabled, skipping async initialization")
+            return
+        
+        if self._pool._health_check_task is not None:
+            logger.info("Connection pool already initialized")
+            return
+        
+        logger.info("Initializing connection pool asynchronously...")
+        await self._pool.initialize()
+        logger.info("Connection pool initialized successfully")
 
     @property
     def is_initialized(self) -> bool:
@@ -1290,13 +1429,22 @@ def initialize_duckdb(
     enable_snapshots: bool = True,
     snapshot_keep_count: int = 5,
     snapshots_dir: str = "data/snapshots",
+    # Phase 1: Connection pool parameters
+    enable_connection_pool: Optional[bool] = None,
+    pool_config: Optional[Dict[str, Any]] = None,
 ) -> DuckDBClient:
     """
     Initialize global DuckDB client.
+    
+    Phase 1: Supports optional connection pooling via environment variables.
 
     Args:
         db_path: Path to DuckDB database file, or ":memory:" for in-memory.
         enable_snapshots: Enable automatic snapshots for in-memory mode.
+        snapshot_keep_count: Number of snapshots to retain
+        snapshots_dir: Directory for snapshot storage
+        enable_connection_pool: Enable connection pooling (None = from env var)
+        pool_config: Connection pool configuration dict
 
     Returns:
         Initialized DuckDBClient instance
@@ -1306,11 +1454,28 @@ def initialize_duckdb(
         logger.warning("DuckDB client already initialized")
         return _duckdb_client
 
+    # Phase 1: Check if connection pool is enabled
+    if enable_connection_pool is None:
+        enable_connection_pool = os.getenv("ENABLE_CONNECTION_POOL", "false").lower() == "true"
+    
+    # Build pool configuration from environment if not provided
+    if enable_connection_pool and pool_config is None:
+        pool_config = {
+            "max_connections": int(os.getenv("CONNECTION_POOL_MAX_SIZE", "5")),
+            "min_connections": int(os.getenv("CONNECTION_POOL_MIN_SIZE", "1")),
+            "connection_timeout": float(os.getenv("CONNECTION_POOL_TIMEOUT", "30.0")),
+            "max_idle_time": float(os.getenv("CONNECTION_POOL_MAX_IDLE_TIME", "300.0")),
+            "health_check_interval": float(os.getenv("CONNECTION_POOL_HEALTH_CHECK_INTERVAL", "60.0")),
+        }
+        logger.info(f"Connection pool enabled with config: {pool_config}")
+    
     _duckdb_client = DuckDBClient(
         db_path,
         enable_snapshots=enable_snapshots,
         snapshot_keep_count=snapshot_keep_count,
         snapshots_dir=snapshots_dir,
+        enable_connection_pool=enable_connection_pool,
+        pool_config=pool_config,
     )
     _duckdb_client.initialize()
     return _duckdb_client
