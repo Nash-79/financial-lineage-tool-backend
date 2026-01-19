@@ -24,6 +24,14 @@ except ImportError:
     CONNECTION_POOL_AVAILABLE = False
     logger.warning("Connection pool module not available, using singleton mode only")
 
+# Phase 2: Transaction support
+try:
+    from src.storage.duckdb_transactions import DuckDBTransaction, TransactionManager
+    TRANSACTIONS_AVAILABLE = True
+except ImportError:
+    TRANSACTIONS_AVAILABLE = False
+    logger.warning("Transaction module not available")
+
 logger = logging.getLogger(__name__)
 
 
@@ -1403,6 +1411,49 @@ class DuckDBClient:
         logger.info("Initializing connection pool asynchronously...")
         await self._pool.initialize()
         logger.info("Connection pool initialized successfully")
+    
+    def transaction(self):
+        """
+        Get a transaction context for database operations.
+        
+        Phase 2: Provides ACID transaction support with automatic rollback on errors.
+        Supports both connection pool and singleton modes.
+        
+        Usage:
+            async with client.transaction() as tx:
+                await tx.execute("INSERT INTO ...")
+                await tx.execute("UPDATE ...")
+                # Automatically commits on success, rolls back on error
+        
+        Returns:
+            DuckDBTransaction: Transaction context manager
+        
+        Raises:
+            RuntimeError: If transactions are not available
+        """
+        if not TRANSACTIONS_AVAILABLE:
+            raise RuntimeError(
+                "Transaction support not available. "
+                "Ensure src.storage.duckdb_transactions is installed."
+            )
+        
+        if self._enable_pool and self._pool:
+            # Pool mode: Get connection from pool
+            from contextlib import asynccontextmanager
+            
+            @asynccontextmanager
+            async def _pool_transaction():
+                async with self._pool.get_connection() as pooled_conn:
+                    async with DuckDBTransaction(pooled_conn.connection) as tx:
+                        yield tx
+            
+            return _pool_transaction()
+        else:
+            # Singleton mode: Use direct connection
+            if not self.conn:
+                raise RuntimeError("Database connection not initialized")
+            
+            return DuckDBTransaction(self.conn)
 
     @property
     def is_initialized(self) -> bool:
