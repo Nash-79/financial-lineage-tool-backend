@@ -114,6 +114,22 @@ class DuckDBClient:
             self.conn: Optional[duckdb.DuckDBPyConnection] = None
             self._write_lock = asyncio.Lock()
         
+        # Phase 3: Query cache initialization
+        self._query_cache: Optional[QueryCache] = None
+        if QUERY_CACHE_AVAILABLE:
+            try:
+                # Try to get Redis client if available
+                redis_client = self._get_redis_client()
+                self._query_cache = QueryCache(
+                    redis_client=redis_client,
+                    default_ttl=300,
+                    max_memory_cache_size=1000
+                )
+                logger.info("QueryCache initialized")
+            except Exception as e:
+                logger.warning(f"QueryCache initialization failed: {e}. Continuing without cache.")
+                self._query_cache = None
+        
         # Initialize snapshot manager for in-memory mode (singleton only)
         self.snapshot_manager: Optional[SnapshotManager] = None
         self._pending_snapshot = False  # Track if snapshot is needed
@@ -1475,6 +1491,23 @@ class DuckDBClient:
                 raise RuntimeError("Database connection not initialized")
             
             return DuckDBTransaction(self.conn)
+    
+    def _get_redis_client(self) -> Optional[Any]:
+        """
+        Get Redis client if available.
+        
+        Phase 3: Helper method for QueryCache initialization.
+        """
+        try:
+            import redis.asyncio as redis
+            import os
+            
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+            client = redis.from_url(redis_url, decode_responses=True)
+            return client
+        except Exception as e:
+            logger.warning(f"Redis client unavailable: {e}")
+            return None
 
     @property
     def is_initialized(self) -> bool:
