@@ -310,7 +310,7 @@ class ModelConfigService:
         return configs
     
     def _invalidate_cache(self) -> None:
-        \"\"\"Invalidate all model config caches.\"\"\"
+        """Invalidate all model config caches."""
         if self.db._query_cache:
             try:
                 # Invalidate all model config related caches
