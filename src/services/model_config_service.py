@@ -48,11 +48,32 @@ class ModelConfigService:
         Get the first enabled model for a usage type.
 
         Raises ValueError if no enabled configs exist.
+        Uses caching for better performance.
         """
+        # Try cache first
+        cache_key = f"model_configs:active:{usage_type}"
+        if self.db._query_cache:
+            try:
+                cached = self.db._query_cache._memory_get(cache_key)
+                if cached:
+                    return cached
+            except Exception:
+                pass  # Continue without cache
+        
         configs = self.repo.get_enabled_by_usage_type(usage_type)
         if not configs:
             raise ValueError(f"No models configured for {usage_type}")
-        return configs[0]["model_id"]
+        
+        result = configs[0]["model_id"]
+        
+        # Cache result
+        if self.db._query_cache:
+            try:
+                self.db._query_cache._memory_set(cache_key, result, ttl=300, compressed=False)
+            except Exception:
+                pass  # Continue without cache
+        
+        return result
 
     def get_fallback_chain(self, usage_type: str) -> List[str]:
         """Get ordered list of enabled models for a usage type (for retry logic)."""
@@ -64,8 +85,25 @@ class ModelConfigService:
         return self.repo.get_by_usage_type(usage_type)
 
     def get_all_configs(self) -> List[Dict[str, Any]]:
-        """Get all configurations."""
-        return self.repo.get_all()
+        """Get all configurations with caching."""
+        cache_key = "model_configs:all"
+        if self.db._query_cache:
+            try:
+                cached = self.db._query_cache._memory_get(cache_key)
+                if cached:
+                    return cached
+            except Exception:
+                pass
+        
+        result = self.repo.get_all()
+        
+        if self.db._query_cache:
+            try:
+                self.db._query_cache._memory_set(cache_key, result, ttl=300, compressed=False)
+            except Exception:
+                pass
+        
+        return result
 
     def get_all_configs_grouped(self) -> Dict[str, List[Dict[str, Any]]]:
         """Get all configurations grouped by usage_type."""
@@ -107,8 +145,8 @@ class ModelConfigService:
         parameters: Optional[Dict[str, Any]] = None,
         enabled: bool = True,
     ) -> Dict[str, Any]:
-        """Upsert a model configuration."""
-        return self.repo.upsert(
+        """Upsert a model configuration with cache invalidation."""
+        result = self.repo.upsert(
             usage_type=usage_type,
             priority=priority,
             model_id=model_id,
@@ -117,10 +155,18 @@ class ModelConfigService:
             parameters=parameters,
             enabled=enabled,
         )
+        
+        # Invalidate cache
+        self._invalidate_cache()
+        
+        return result
 
     def delete_config(self, usage_type: str, priority: int) -> bool:
-        """Delete a specific configuration."""
-        return self.repo.delete(usage_type, priority)
+        """Delete a specific configuration with cache invalidation."""
+        result = self.repo.delete(usage_type, priority)
+        if result:
+            self._invalidate_cache()
+        return result
 
     def validate_model(self, usage_type: str, model_id: str) -> bool:
         """Validate that a model is configured for a usage type."""
@@ -262,3 +308,13 @@ class ModelConfigService:
         })
         
         return configs
+    
+    def _invalidate_cache(self) -> None:
+        \"\"\"Invalidate all model config caches.\"\"\"
+        if self.db._query_cache:
+            try:
+                # Invalidate all model config related caches
+                self.db._query_cache._memory_delete_pattern(\"model_configs:*\")
+                logger.debug(\"Invalidated model config caches\")
+            except Exception as e:
+                logger.warning(f\"Cache invalidation failed: {e}\")
