@@ -299,28 +299,59 @@ class SnapshotManager:
 
     @staticmethod
     def _get_snapshot_record_count(snapshot_path: Path) -> int:
-        """Compute total row count across all tables in a snapshot."""
+        """
+        Compute total row count across all tables in a snapshot.
+        
+        Handles missing or corrupted snapshots gracefully.
+        Re-runnable and idempotent.
+        """
         if not snapshot_path.exists():
+            logger.debug(f"Snapshot path does not exist: {snapshot_path}")
             return 0
+        
+        # Check if snapshot directory has required files
+        if snapshot_path.is_dir():
+            schema_file = snapshot_path / "schema.sql"
+            if not schema_file.exists():
+                logger.debug(
+                    f"Snapshot {snapshot_path.name} missing schema.sql, "
+                    "cannot compute record count (returning 0)"
+                )
+                return 0
 
         conn = None
         try:
             conn = duckdb.connect(":memory:")
-            conn.execute(f"IMPORT DATABASE '{snapshot_path}'")
+            
+            # Import the snapshot
+            import_path = str(snapshot_path)
+            conn.execute(f"IMPORT DATABASE '{import_path}'")
 
+            # Get all tables
             tables = conn.execute(
                 "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
             ).fetchall()
             table_names = [row[0] for row in tables]
 
+            # Count total rows
             total_rows = 0
             for table in table_names:
-                count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                total_rows += count
+                try:
+                    count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                    total_rows += count
+                except Exception as e:
+                    logger.debug(f"Could not count rows in table {table}: {e}")
+                    continue
 
+            logger.debug(f"Snapshot {snapshot_path.name} has {total_rows} total rows")
             return total_rows
+            
         except Exception as e:
-            logger.warning(f"Failed to compute snapshot record count: {e}")
+            # Log at debug level to avoid spamming logs
+            logger.debug(
+                f"Could not compute record count for {snapshot_path.name}: {e}. "
+                "This is normal for incomplete or corrupted snapshots."
+            )
             return 0
         finally:
             if conn:
