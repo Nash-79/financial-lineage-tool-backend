@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Supported SQL dialects registry
 # Maps display names to sqlglot dialect keys
+# Comprehensive list of major SQL dialects supported by SQLGlot
 SQL_DIALECTS = {
     "tsql": {
         "id": "tsql",
@@ -81,10 +82,82 @@ SQL_DIALECTS = {
     "fabric": {
         "id": "fabric",
         "display_name": "Microsoft Fabric",
-        "sqlglot_read_key": "tsql",
+        "sqlglot_read_key": "fabric",
         "enabled": True,
         "is_default": False,
-        "description": "Microsoft Fabric (T-SQL compatible)",
+        "description": "Microsoft Fabric",
+    },
+    "redshift": {
+        "id": "redshift",
+        "display_name": "Amazon Redshift",
+        "sqlglot_read_key": "redshift",
+        "enabled": True,
+        "is_default": False,
+        "description": "Amazon Redshift data warehouse",
+    },
+    "presto": {
+        "id": "presto",
+        "display_name": "Presto",
+        "sqlglot_read_key": "presto",
+        "enabled": True,
+        "is_default": False,
+        "description": "Presto distributed SQL query engine",
+    },
+    "trino": {
+        "id": "trino",
+        "display_name": "Trino",
+        "sqlglot_read_key": "trino",
+        "enabled": True,
+        "is_default": False,
+        "description": "Trino distributed SQL query engine (Presto fork)",
+    },
+    "hive": {
+        "id": "hive",
+        "display_name": "Apache Hive",
+        "sqlglot_read_key": "hive",
+        "enabled": True,
+        "is_default": False,
+        "description": "Apache Hive data warehouse",
+    },
+    "sqlite": {
+        "id": "sqlite",
+        "display_name": "SQLite",
+        "sqlglot_read_key": "sqlite",
+        "enabled": True,
+        "is_default": False,
+        "description": "SQLite embedded database",
+    },
+    "athena": {
+        "id": "athena",
+        "display_name": "Amazon Athena",
+        "sqlglot_read_key": "athena",
+        "enabled": True,
+        "is_default": False,
+        "description": "Amazon Athena serverless query service",
+    },
+    "databricks": {
+        "id": "databricks",
+        "display_name": "Databricks",
+        "sqlglot_read_key": "databricks",
+        "enabled": True,
+        "is_default": False,
+        "description": "Databricks Lakehouse Platform",
+    },
+    "clickhouse": {
+        "id": "clickhouse",
+        "display_name": "ClickHouse",
+        "sqlglot_read_key": "clickhouse",
+        "enabled": True,
+        "is_default": False,
+        "description": "ClickHouse OLAP database",
+    },
+    "teradata": {
+        "id": "teradata",
+        "display_name": "Teradata",
+        "sqlglot_read_key": "teradata",
+        "enabled": True,
+        "is_default": False,
+        "description": "Teradata data warehouse",
     },
 }
 
