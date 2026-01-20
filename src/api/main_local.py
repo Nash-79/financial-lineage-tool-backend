@@ -35,8 +35,9 @@ from src.services import (
     ValidationAgent,
     KGEnrichmentAgent,
 )
-from src.storage.duckdb_client import initialize_duckdb, close_duckdb
+from src.storage.duckdb_client import initialize_duckdb, close_duckdb, get_duckdb_client
 from src.storage.metadata_store import ensure_default_project
+from src.utils.loguru_config import setup_logging
 from src.utils.otel import setup_otel
 
 from .config import config
@@ -59,10 +60,13 @@ from .routers import (
     ingest,
     ingestion_logs,
     lineage,
+    logs,
     metadata,
+    models,
     projects,
     qdrant,
     snapshots,
+    system,
 )
 
 
@@ -116,6 +120,8 @@ async def lifespan(app: FastAPI):
     Yields:
         None during application runtime.
     """
+    # Initialize Loguru logging first
+    setup_logging()
     print("[*] Starting Local Lineage Tool with Neo4j...")
 
     # Create data and log directories
@@ -157,6 +163,42 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[!] WARNING: Failed to initialize DuckDB: {e}")
         print("[!] Metadata storage will not be available")
+
+    # Initialize ModelConfigService for unified model configuration
+    print("[*] Initializing ModelConfigService...")
+    model_service = None
+    try:
+        from src.services.model_config_service import ModelConfigService
+
+        db = get_duckdb_client()
+        model_service = ModelConfigService(db)
+        print("[+] ModelConfigService initialized with auto-seeded defaults")
+        
+        # Verify all required usage types have configs
+        required_usage_types = ["chat_deep", "chat_graph", "chat_semantic", "chat_text", "chat_title", "embedding", "inference", "kg_edge_creation"]
+        print("[*] Verifying model configurations...")
+        missing_configs = []
+        for usage_type in required_usage_types:
+            try:
+                config_model = model_service.get_active_model(usage_type)
+                if config_model:
+                    print(f"  ✓ {usage_type}: {config_model}")
+                else:
+                    missing_configs.append(usage_type)
+                    print(f"  ✗ {usage_type}: NO ACTIVE CONFIG")
+            except Exception as e:
+                missing_configs.append(usage_type)
+                print(f"  ✗ {usage_type}: ERROR - {e}")
+        
+        if missing_configs:
+            print(f"[!] WARNING: Missing configurations for: {', '.join(missing_configs)}")
+            print("[!] These features may not work properly. Seed defaults with POST /api/v1/models/config/seed")
+        else:
+            print("[+] All required model configurations verified!")
+    except Exception as e:
+        print(f"[!] WARNING: Failed to initialize ModelConfigService: {e}")
+        print("[!] Model configuration will not be available")
+        model_service = None
 
     # Initialize Redis client for caching (before Ollama so we can pass it)
     print(f"[*] Connecting to Redis at {config.REDIS_HOST}:{config.REDIS_PORT}...")
@@ -312,6 +354,7 @@ async def lifespan(app: FastAPI):
                 qdrant=state.qdrant,
                 graph=state.graph,
                 openrouter_api_key=config.OPENROUTER_API_KEY,
+                model_config_service=model_service,
             )
             print("[+] ChatService initialized")
         else:
@@ -323,6 +366,7 @@ async def lifespan(app: FastAPI):
             state.kg_agent = KGEnrichmentAgent(
                 graph_client=state.graph,
                 openrouter_service=state.openrouter_service,
+                model_config_service=model_service,
             )
         else:
             state.kg_agent = None
@@ -576,7 +620,10 @@ app.include_router(database.router)  # Database schema endpoints
 app.include_router(files.router)  # File upload endpoints
 app.include_router(github.router)  # GitHub integration endpoints
 app.include_router(metadata.router)  # Metadata query endpoints
+app.include_router(models.router)  # Model configuration endpoints
 app.include_router(config_router.router)  # Configuration endpoints
 app.include_router(ingestion_logs.router)  # Ingestion log endpoints
+app.include_router(logs.router)  # Unified log viewer endpoints
+app.include_router(system.router)  # System status endpoints
 app.include_router(snapshots.router)  # Snapshot management endpoints
 app.include_router(qdrant.router)  # Qdrant chunk lookup endpoints
