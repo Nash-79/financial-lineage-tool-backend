@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..models.error import ErrorResponse
+from src.utils.loguru_config import bind_request_context, clear_request_context
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,12 @@ def setup_error_handlers(app: FastAPI):
             request.state.request_id = request.headers.get(
                 "X-Request-ID", uuid.uuid4().hex
             )
-        return await call_next(request)
+        correlation_id = request.headers.get("X-Correlation-ID")
+        bind_request_context(request.state.request_id, correlation_id=correlation_id)
+        try:
+            return await call_next(request)
+        finally:
+            clear_request_context()
 
 
 def _create_error_response(
