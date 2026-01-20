@@ -75,6 +75,9 @@ services:
       - STORAGE_PATH=/app/data
       # LlamaIndex configuration
       - USE_LLAMAINDEX=true
+      # DuckDB mode (embedded for persistence)
+      - DUCKDB_MODE=embedded
+      - DUCKDB_PATH=/app/data/lineage.duckdb
     volumes:
       - ./src:/app/src:ro
       - ./config:/app/config:ro
@@ -120,6 +123,21 @@ services:
     volumes:
       - ./notebooks:/home/jovyan/work
       - ./src:/home/jovyan/src:ro
+    networks:
+      - lineage-local
+
+  # Frontend (React + Nginx)
+  frontend:
+    build:
+      context: ../financial-lineage-tool-frontend
+      dockerfile: Dockerfile
+    container_name: lineage-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
     networks:
       - lineage-local
 
