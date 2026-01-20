@@ -317,7 +317,7 @@ class DuckDBClient:
         # Check current version
         result = self.conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
         current_version = result[0] if result and result[0] else 0
-        target_version = 8
+        target_version = 9
 
         # Migration status banner
         logger.info("=" * 70)
@@ -397,6 +397,15 @@ class DuckDBClient:
                 "Migration 7 -> 8 completed successfully (model configs table)"
             )
             current_version = 8
+
+        if current_version == 8:
+            # V9: Add sql_dialects table for SQL dialect configuration
+            self._migrate_to_v9()
+            self.conn.execute("INSERT INTO schema_version (version) VALUES (9)")
+            logger.info(
+                "Migration 8 -> 9 completed successfully (sql_dialects table)"
+            )
+            current_version = 9
 
         self._ensure_file_macros()
 
@@ -936,8 +945,8 @@ class DuckDBClient:
                 provider VARCHAR NOT NULL,
                 parameters JSON,
                 enabled BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT current_timestamp,
+                updated_at TIMESTAMP DEFAULT current_timestamp,
                 UNIQUE (usage_type, priority)
             )
         """
